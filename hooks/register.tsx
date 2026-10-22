@@ -1049,6 +1049,8 @@ export const register: Register = (on, options) => {
         await update($, now, () => at)
       })()
     })
+    // Once per session: a hot reload after the person closed the panel does not reopen it.
+    if (options.openAtStart !== 'off') await autoOpen($, 'session-start')
     return started
   })
 

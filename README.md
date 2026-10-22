@@ -76,10 +76,12 @@ Costs are rough estimates from token counts and list prices (as of 2026-10-10), 
 
 `autoOpen`: `any` (default) or `savvy`. With `any` the panel also opens, once per session, when any subagent starts; with `savvy` only for savvy-flow workers and reported plans.
 
+`openAtStart`: `on` (default) or `off`. With `on` the panel opens when a session starts (once per session, so closing it stays closed); with `off` it opens only per `autoOpen` or `/crew`.
+
 Set them in `/config`, or in `~/.claude/settings.json`:
 
 ```json
-{ "pluginConfigs": { "crew-progress": { "options": { "language": "en", "autoOpen": "any" } } } }
+{ "pluginConfigs": { "crew-progress": { "options": { "language": "en", "autoOpen": "any", "openAtStart": "on" } } } }
 ```
 
 ## Development

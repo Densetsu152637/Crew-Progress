@@ -1,6 +1,6 @@
 {
   "name": "crew-progress",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agents panel (/crew) with the main session's own row (model, effort, context, estimated cost, time) and a pixel-crab costume per workflow profile, plus the progress bar above the prompt. A fork of savvy-progress by johnnyvizz (MIT).",
   "author": {
     "name": "Densetsu152637",
@@ -28,6 +28,16 @@
       "options": [
         "any",
         "savvy"
+      ]
+    },
+    "openAtStart": {
+      "type": "string",
+      "title": "Open at start",
+      "description": "on: the panel opens when a session starts. off: it opens only per autoOpen or /crew.",
+      "default": "on",
+      "options": [
+        "on",
+        "off"
       ]
     }
   },
