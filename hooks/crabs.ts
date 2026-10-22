@@ -233,10 +233,11 @@ export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
     stamp(f, 0, 8, ['tttttt', 'tbbbbt', 'tbbbbt', 'tttttt', 'tbbbbt'], { t, b: '#94A3B8' })
     f(6, 11, 2, 1, '#475569'); f(6, 13, 2, 1, '#475569')
   },
-  // Guide: a sun hat and a tour flag on a pole; the flag waves.
+  // Guide: a red info cap and a tour flag on a pole; the flag waves.
   guide: (f, t) => {
     crabBody(f, -4)
-    stamp(f, 5, 3, ['.....hhhhhhhhhh.....', '.....hhhhhhhhhh.....', '.....tttttttttt.....', 'bbbbbbbbbbbbbbbbbbbbb', '.bbbbbbbbbbbbbbbbbbb.'], { h: '#E8D08A', t, b: '#D9BC6A' })
+    stamp(f, 8, 5, ['..rrrrrrrrrr..', '.rrrrrrrrrrrr.', 'rrrrrrrrrrrrrr', 'rrrrrrrrrrrrrr', 'ddddddddddddddddddd'], { r: '#FF3B30', d: '#A31218' })
+    f(13, 6, 2, 1, '#FFFFFF'); f(13, 8, 2, 1, '#FFFFFF')
     f(25, 0, 1, 13, '#8B5A2B')
     f(26, 0, 4, 5, t, 'flag'); f(27, 1, 2, 1, '#FFFFFF', 'flag'); f(27, 3, 2, 1, '#FFFFFF', 'flag')
   },
