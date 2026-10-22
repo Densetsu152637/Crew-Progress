@@ -15,6 +15,13 @@ const PROP: Record<string, string> = {
   critic: 'mono',
   documenter: 'quill',
   tester: 'bub',
+  researcher: 'pg',
+  debugger: 'net',
+  analyst: 'bars',
+  architect: 'sq',
+  auditor: 'glint',
+  navigator: 'cur',
+  inspector: 'flash',
 }
 
 const engine = (on: On) => {
@@ -84,12 +91,16 @@ test('profile (b) wins over a savvy tier', async ($, on) => {
   expectRole(await rowOf($, 'Map the repo'), 'explorer')
 })
 
-test('profile (c): a savvy tier with no tag keeps its tier costume', async ($, on) => {
+test('profile (c): a savvy tier with no tag is the plain crab, labelled by its tier', async ($, on) => {
   engine(on)
   await spawn($, 'Heavy lifting', 'savvy-heavy', 'Do the hard part.')
-  const source = await rowOf($, 'Heavy lifting')
-  expect(source).toContain('class="c-heavy run"')
-  expect(source).toContain('>heavy</tspan>')
+  await spawn($, 'Careful work', 'savvy-careful', 'Take care.')
+  for (const [description, tier] of [['Heavy lifting', 'heavy'], ['Careful work', 'careful']] as const) {
+    const source = await rowOf($, description)
+    expect(source).toContain('class="c-other run"')
+    expect(source).not.toContain(`class="c-${tier}`)
+    expect(source).toContain(`>${tier}</tspan>`)
+  }
 })
 
 test('profile fallback: an unknown tag or no tag is other, shown by its type', async ($, on) => {
@@ -102,12 +113,26 @@ test('profile fallback: an unknown tag or no tag is other, shown by its type', a
     expect(source).toContain('class="c-other run"')
     expect(source).toContain('>general-purpose</tspan>')
   }
-  expect(await rowOf($, 'Scout')).toContain('class="c-explore run"')
+  const scout = await rowOf($, 'Scout')
+  expect(scout).toContain('class="c-other run"')
+  expect(scout).not.toContain('class="c-explore ')
+  expect(scout).toContain('>Explore</tspan>')
+})
+
+test('profile (b): the domain profiles, from the brief tag', async ($, on) => {
+  engine(on)
+  await spawn($, 'Dig up sources', 'general-purpose', 'Role: leaf; Profile: researcher\nFind the papers.')
+  await spawn($, 'Chase the crash', 'Explore', 'Role: leaf; Profile: debugger\nWhy does it crash?')
+  expectRole(await rowOf($, 'Dig up sources'), 'researcher')
+  expectRole(await rowOf($, 'Chase the crash'), 'debugger')
 })
 
 test('every profile has its own costume', async ($, on) => {
   engine(on)
-  const profiles = ['manager', 'explorer', 'implementer', 'validator', 'critic', 'documenter', 'tester']
+  const profiles = [
+    'manager', 'explorer', 'implementer', 'validator', 'critic', 'documenter', 'tester',
+    'researcher', 'debugger', 'analyst', 'architect', 'auditor', 'navigator', 'inspector',
+  ]
   for (const p of profiles) await spawn($, `As ${p}`, 'general-purpose', `Role: leaf; Profile: ${p}\nGo.`)
   for (const p of profiles) expectRole(await rowOf($, `As ${p}`), p)
 })

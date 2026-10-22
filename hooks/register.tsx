@@ -3,7 +3,7 @@ import type { EngineInterface, Register, SessionContextUsage, SessionUsage } fro
 
 import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
 
-import { CLAY, CRAB_BOX, CRAB_CSS, CRAB_SCALE, crab, colorOf, TIER_COLOR } from './crabs'
+import { CLAY, COSTUMES, CRAB_BOX, CRAB_CSS, CRAB_SCALE, crab, colorOf, TIER_COLOR } from './crabs'
 
 // crew-progress: a fork of johnnyvizz's savvy-progress (MIT) that adds the main
 // session's own row and a costume per workflow profile. Every namespace below
@@ -33,7 +33,10 @@ const PANE = 'crew-agents'
 const PHASES: readonly Phase[] = ['plan', 'design', 'delegate', 'review', 'close']
 const TIERS: readonly string[] = ['fable', 'heavy', 'careful', 'medium', 'light']
 // Workflow profiles a dispatched agent can carry; `root` is the main session's row alone.
-const PROFILES: readonly string[] = ['explorer', 'implementer', 'validator', 'critic', 'documenter', 'tester', 'manager']
+const PROFILES: readonly string[] = [
+  'explorer', 'implementer', 'validator', 'critic', 'documenter', 'tester', 'manager',
+  'researcher', 'debugger', 'analyst', 'architect', 'auditor', 'navigator', 'inspector',
+]
 // The brief's tag line, e.g. `Role: leaf; Profile: implementer`: the first match counts.
 const PROFILE_TAG = /\bProfile:\s*([a-z-]+)/i
 // The tools' schemas are advice to the model, not a check: what a call may ask
@@ -93,7 +96,8 @@ const STRINGS = {
     tier: {
       light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
-      critic: 'critic', documenter: 'documenter', tester: 'tester',
+      critic: 'critic', documenter: 'documenter', tester: 'tester', researcher: 'researcher', debugger: 'debugger',
+      analyst: 'analyst', architect: 'architect', auditor: 'auditor', navigator: 'navigator', inspector: 'inspector',
     },
     effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
@@ -130,7 +134,8 @@ const STRINGS = {
     tier: {
       light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
-      critic: 'critic', documenter: 'documenter', tester: 'tester',
+      critic: 'critic', documenter: 'documenter', tester: 'tester', researcher: 'researcher', debugger: 'debugger',
+      analyst: 'analyst', architect: 'architect', auditor: 'auditor', navigator: 'navigator', inspector: 'inspector',
     },
     effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
@@ -167,7 +172,8 @@ const STRINGS = {
     tier: {
       light: 'קל', medium: 'בינוני', careful: 'זהיר', heavy: 'כבד', fable: 'פייבל', other: 'אחר',
       root: 'ראשי', manager: 'מנהל', explorer: 'חוקר', implementer: 'מיישם', validator: 'מאמת',
-      critic: 'מבקר', documenter: 'מתעד', tester: 'בודק',
+      critic: 'מבקר', documenter: 'מתעד', tester: 'בודק', researcher: 'מחקר', debugger: 'מנפה',
+      analyst: 'אנליסט', architect: 'ארכיטקט', auditor: 'מבקר אבטחה', navigator: 'נווט', inspector: 'בוחן',
     },
     effort: { low: 'נמוך', medium: 'בינוני', high: 'גבוה', xhigh: 'גבוה מאוד', max: 'מקסימלי' },
   },
@@ -477,10 +483,11 @@ const roleOfSpawn = (type: string, prompt: string): string => {
 // A run's role: what the spawn detected, else (runs stored before roles were) its tier.
 const roleOf = (a: AgentRun): string => a.role ?? tierOf(a.type)
 
-// The built-in Explore agent keeps the pirate when no profile claimed it.
+// A run's costume: its profile's, else the plain crab (savvy tiers and the built-in
+// Explore agent have no costume of their own since 0.4.0).
 const costumeOf = (a: AgentRun): string => {
   const role = roleOf(a)
-  return role === 'other' && a.type === 'Explore' ? 'explore' : role
+  return Object.hasOwn(COSTUMES, role) ? role : 'other'
 }
 
 // The word under a run's title: its role, or its type when it has none.
@@ -654,7 +661,7 @@ const plannedSvg = (W: number, p: Planned): string => {
   return svg(
     W,
     46,
-    `${rowCrab(W, 0, 6, tier, true)}
+    `${rowCrab(W, 0, 6, 'other', true)}
 <text class="s" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(`${p.n}. ${p.title}`, 13, textW))}</text>
 <text ${startText(W, 42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tierWord(tier))}</tspan><tspan class="m">  ${xml(meta.filter(Boolean).join('  ·  '))}</tspan></text>
 ${statusMark(mx(W, W - 8), 16, 'planned', color)}
@@ -666,7 +673,7 @@ const compactSvg = (W: number, list: AgentRun[], planned: Planned[], t: ReturnTy
   const icons = [
     ...list.filter(a => a.status === 'running').map(a => ({ k: costumeOf(a), c: colorOf(roleOf(a)), s: 'running', dim: false })),
     ...list.filter(a => a.status !== 'running').map(a => ({ k: costumeOf(a), c: colorOf(roleOf(a)), s: a.status, dim: false })),
-    ...planned.map(p => ({ k: p.tier in TIER_COLOR ? p.tier : 'other', c: colorOf(p.tier), s: 'planned', dim: true })),
+    ...planned.map(p => ({ k: 'other', c: colorOf(p.tier), s: 'planned', dim: true })),
   ]
   const fit = Math.max(1, Math.floor((W - 150) / 36))
   const shown = icons.slice(0, fit)

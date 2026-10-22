@@ -1,0 +1,25 @@
+# The README gallery's images must match hooks/crabs.ts: one SVG per costume, none
+# stale or left over. `claude plugin test` cannot read files, so CI runs the check.
+name: Costumes
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  gallery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Gallery images match the costumes
+        run: node tools/render-costumes.mjs --check
