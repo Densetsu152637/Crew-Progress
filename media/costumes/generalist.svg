@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="136" height="136" viewBox="0 0 136 136" role="img" aria-label="generalist crab">
+<title>generalist crab</title>
+<style>
+.run .la{animation:st .5s steps(1) infinite}.run .lb{animation:st .5s steps(1) infinite -.25s}
+.run .bd{animation:bob .5s steps(1) infinite -.125s}
+.run g{transform-box:fill-box}
+@keyframes st{50%{transform:translateY(-1px)}}@keyframes bob{50%{transform:translateY(1px)}}
+@keyframes blink{50%{opacity:.15}}
+.c-root.run .gem{animation:blink 1s steps(1) infinite}
+.c-manager.run .baton{transform-origin:50% 100%;animation:conduct .5s ease-in-out infinite}
+@keyframes conduct{50%{transform:rotate(-30deg)}}
+.c-explorer.run .lan{transform-origin:50% 0;animation:swing 1s ease-in-out infinite}
+@keyframes swing{25%{transform:rotate(12deg)}75%{transform:rotate(-12deg)}}
+.c-implementer.run .ham{transform-origin:50% 100%;animation:hammer .5s ease-in infinite}
+@keyframes hammer{50%{transform:rotate(-40deg)}}
+.c-validator.run .ck{animation:blink .5s steps(1) infinite}
+.c-critic.run .mono{animation:blink 1s steps(1) infinite -.5s}
+.c-documenter.run .quill{transform-origin:0 100%;animation:write .5s ease-in-out infinite}
+@keyframes write{50%{transform:rotate(15deg)}}
+.c-tester.run .bub{animation:rise .5s steps(2) infinite}
+@keyframes rise{100%{transform:translateY(-2px);opacity:0}}
+.c-researcher.run .pg{transform-origin:0 50%;animation:leaf 1s ease-in-out infinite}
+@keyframes leaf{50%{transform:scaleX(-1)}}
+.c-debugger.run .net{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
+.c-debugger.run .bug{animation:buzz .25s steps(1) infinite}
+@keyframes sweep{50%{transform:rotate(-25deg)}}@keyframes buzz{50%{transform:translate(1px,-1px)}}
+.c-analyst.run .bars{transform-origin:50% 100%;animation:grow 1s ease-in-out infinite}
+@keyframes grow{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.c-architect.run .sq{transform-origin:0 100%;animation:measure 1s ease-in-out infinite}
+@keyframes measure{50%{transform:rotate(-15deg)}}
+.c-auditor.run .glint{animation:blink .5s steps(1) infinite}
+.c-navigator.run .cur{animation:click .5s steps(1) infinite}
+.c-navigator.run .link{animation:blink .5s steps(1) infinite -.25s}
+@keyframes click{50%{transform:translate(1px,1px)}}
+.c-inspector.run .flash{animation:blink 1s steps(1) infinite}
+.c-inspector.run .note{animation:rise 1s steps(4) infinite}
+.c-generalist.run .spark{animation:blink .5s steps(1) infinite}
+.c-guide.run .flag{transform-origin:0 50%;animation:wave .5s ease-in-out infinite}
+@keyframes wave{50%{transform:scaleX(.6)}}
+.c-statusline.run .roller{animation:roll 1s ease-in-out infinite}
+@keyframes roll{50%{transform:translateX(-4px)}}
+@media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}
+</style>
+<g transform="translate(8,16) scale(4)" opacity="1" shape-rendering="crispEdges"><g class="c-generalist run"><g class="bd"><rect x="7" y="10" width="16" height="12" fill="#D97757"/><rect x="3" y="14" width="4" height="4" fill="#D97757"/><rect x="23" y="14" width="4" height="4" fill="#D97757"/><rect x="9" y="12" width="2" height="2" fill="#1F1E1D"/><rect x="19" y="12" width="2" height="2" fill="#1F1E1D"/><rect x="10" y="5" width="1" height="1" fill="#64748B"/><rect x="11" y="5" width="1" height="1" fill="#64748B"/><rect x="12" y="5" width="1" height="1" fill="#64748B"/><rect x="13" y="5" width="1" height="1" fill="#64748B"/><rect x="14" y="5" width="1" height="1" fill="#64748B"/><rect x="15" y="5" width="1" height="1" fill="#64748B"/><rect x="16" y="5" width="1" height="1" fill="#64748B"/><rect x="17" y="5" width="1" height="1" fill="#64748B"/><rect x="18" y="5" width="1" height="1" fill="#64748B"/><rect x="19" y="5" width="1" height="1" fill="#64748B"/><rect x="9" y="6" width="1" height="1" fill="#64748B"/><rect x="10" y="6" width="1" height="1" fill="#64748B"/><rect x="11" y="6" width="1" height="1" fill="#64748B"/><rect x="12" y="6" width="1" height="1" fill="#64748B"/><rect x="13" y="6" width="1" height="1" fill="#64748B"/><rect x="14" y="6" width="1" height="1" fill="#64748B"/><rect x="15" y="6" width="1" height="1" fill="#64748B"/><rect x="16" y="6" width="1" height="1" fill="#64748B"/><rect x="17" y="6" width="1" height="1" fill="#64748B"/><rect x="18" y="6" width="1" height="1" fill="#64748B"/><rect x="19" y="6" width="1" height="1" fill="#64748B"/><rect x="20" y="6" width="1" height="1" fill="#64748B"/><rect x="8" y="7" width="1" height="1" fill="#64748B"/><rect x="9" y="7" width="1" height="1" fill="#64748B"/><rect x="10" y="7" width="1" height="1" fill="#64748B"/><rect x="11" y="7" width="1" height="1" fill="#64748B"/><rect x="12" y="7" width="1" height="1" fill="#64748B"/><rect x="13" y="7" width="1" height="1" fill="#64748B"/><rect x="14" y="7" width="1" height="1" fill="#64748B"/><rect x="15" y="7" width="1" height="1" fill="#64748B"/><rect x="16" y="7" width="1" height="1" fill="#64748B"/><rect x="17" y="7" width="1" height="1" fill="#64748B"/><rect x="18" y="7" width="1" height="1" fill="#64748B"/><rect x="19" y="7" width="1" height="1" fill="#64748B"/><rect x="20" y="7" width="1" height="1" fill="#64748B"/><rect x="21" y="7" width="1" height="1" fill="#64748B"/><rect x="8" y="8" width="1" height="1" fill="#475569"/><rect x="9" y="8" width="1" height="1" fill="#475569"/><rect x="10" y="8" width="1" height="1" fill="#475569"/><rect x="11" y="8" width="1" height="1" fill="#475569"/><rect x="12" y="8" width="1" height="1" fill="#475569"/><rect x="13" y="8" width="1" height="1" fill="#475569"/><rect x="14" y="8" width="1" height="1" fill="#475569"/><rect x="15" y="8" width="1" height="1" fill="#475569"/><rect x="16" y="8" width="1" height="1" fill="#475569"/><rect x="17" y="8" width="1" height="1" fill="#475569"/><rect x="18" y="8" width="1" height="1" fill="#475569"/><rect x="19" y="8" width="1" height="1" fill="#475569"/><rect x="20" y="8" width="1" height="1" fill="#475569"/><rect x="21" y="8" width="1" height="1" fill="#475569"/><rect x="22" y="8" width="1" height="1" fill="#475569"/><rect x="23" y="8" width="1" height="1" fill="#475569"/><rect x="0" y="8" width="1" height="1" fill="#64748B"/><rect x="1" y="8" width="1" height="1" fill="#64748B"/><rect x="2" y="8" width="1" height="1" fill="#64748B"/><rect x="3" y="8" width="1" height="1" fill="#64748B"/><rect x="4" y="8" width="1" height="1" fill="#64748B"/><rect x="5" y="8" width="1" height="1" fill="#64748B"/><rect x="0" y="9" width="1" height="1" fill="#64748B"/><rect x="1" y="9" width="1" height="1" fill="#94A3B8"/><rect x="2" y="9" width="1" height="1" fill="#94A3B8"/><rect x="3" y="9" width="1" height="1" fill="#94A3B8"/><rect x="4" y="9" width="1" height="1" fill="#94A3B8"/><rect x="5" y="9" width="1" height="1" fill="#64748B"/><rect x="0" y="10" width="1" height="1" fill="#64748B"/><rect x="1" y="10" width="1" height="1" fill="#94A3B8"/><rect x="2" y="10" width="1" height="1" fill="#94A3B8"/><rect x="3" y="10" width="1" height="1" fill="#94A3B8"/><rect x="4" y="10" width="1" height="1" fill="#94A3B8"/><rect x="5" y="10" width="1" height="1" fill="#64748B"/><rect x="0" y="11" width="1" height="1" fill="#64748B"/><rect x="1" y="11" width="1" height="1" fill="#64748B"/><rect x="2" y="11" width="1" height="1" fill="#64748B"/><rect x="3" y="11" width="1" height="1" fill="#64748B"/><rect x="4" y="11" width="1" height="1" fill="#64748B"/><rect x="5" y="11" width="1" height="1" fill="#64748B"/><rect x="0" y="12" width="1" height="1" fill="#64748B"/><rect x="1" y="12" width="1" height="1" fill="#94A3B8"/><rect x="2" y="12" width="1" height="1" fill="#94A3B8"/><rect x="3" y="12" width="1" height="1" fill="#94A3B8"/><rect x="4" y="12" width="1" height="1" fill="#94A3B8"/><rect x="5" y="12" width="1" height="1" fill="#64748B"/><rect x="6" y="11" width="2" height="1" fill="#475569"/><rect x="6" y="13" width="2" height="1" fill="#475569"/><g class="spark"><rect x="14" y="5" width="2" height="1" fill="#FF9A3C"/><rect x="14" y="7" width="2" height="1" fill="#FF9A3C"/><rect x="13" y="6" width="4" height="1" fill="#FF9A3C"/></g></g><g class="la"><rect x="7" y="22" width="2" height="4" fill="#D97757"/><rect x="17" y="22" width="2" height="4" fill="#D97757"/></g><g class="lb"><rect x="11" y="22" width="2" height="4" fill="#D97757"/><rect x="21" y="22" width="2" height="4" fill="#D97757"/></g></g></g>
+</svg>

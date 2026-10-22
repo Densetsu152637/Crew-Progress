@@ -22,6 +22,9 @@ const PROP: Record<string, string> = {
   auditor: 'glint',
   navigator: 'cur',
   inspector: 'flash',
+  generalist: 'spark',
+  guide: 'flag',
+  statusline: 'roller',
 }
 
 const engine = (on: On) => {
@@ -103,20 +106,33 @@ test('profile (c): a savvy tier with no tag is the plain crab, labelled by its t
   }
 })
 
-test('profile fallback: an unknown tag or no tag is other, shown by its type', async ($, on) => {
+test('profile fallback: an unknown tag or no tag is the generalist for general-purpose, else other', async ($, on) => {
   engine(on)
   await spawn($, 'Odd tag', 'general-purpose', 'Role: leaf; Profile: wizard\nDo magic.')
   await spawn($, 'Plain one', 'general-purpose', 'No tag here.')
-  await spawn($, 'Scout', 'Explore', 'Find the config.')
   for (const description of ['Odd tag', 'Plain one']) {
     const source = await rowOf($, description)
-    expect(source).toContain('class="c-other run"')
+    expect(source).toContain('class="c-generalist run"')
     expect(source).toContain('>general-purpose</tspan>')
   }
-  const scout = await rowOf($, 'Scout')
-  expect(scout).toContain('class="c-other run"')
-  expect(scout).not.toContain('class="c-explore ')
-  expect(scout).toContain('>Explore</tspan>')
+  await spawn($, 'Mystery', 'mystery-agent', 'Go.')
+  const mystery = await rowOf($, 'Mystery')
+  expect(mystery).toContain('class="c-other run"')
+  expect(mystery).toContain('>mystery-agent</tspan>')
+})
+
+test('profile (c): built-in agent types', async ($, on) => {
+  engine(on)
+  const cases: [string, string, string][] = [
+    ['Explore', 'explorer', 'Explore'], ['explore', 'explorer', 'explore'], ['Plan', 'architect', 'Plan'],
+    ['web-fetch', 'researcher', 'web-fetch'], ['general-purpose', 'generalist', 'general-purpose'],
+    ['claude', 'generalist', 'claude'], ['claude-code-guide', 'guide', 'claude-code-guide'],
+    ['statusline-setup', 'statusline', 'statusline-setup'],
+  ]
+  for (const [type] of cases) await spawn($, `Built-in ${type}`, type, 'Go.')
+  for (const [type, role, word] of cases) expectRole(await rowOf($, `Built-in ${type}`), role, word)
+  await spawn($, 'Tag wins', 'general-purpose', 'Role: leaf; Profile: debugger\nWhy?')
+  expectRole(await rowOf($, 'Tag wins'), 'debugger')
 })
 
 test('profile (b): the domain profiles, from the brief tag', async ($, on) => {

@@ -37,6 +37,12 @@ const PROFILES: readonly string[] = [
   'explorer', 'implementer', 'validator', 'critic', 'documenter', 'tester', 'manager',
   'researcher', 'debugger', 'analyst', 'architect', 'auditor', 'navigator', 'inspector',
 ]
+// Claude Code's built-in subagent types, drawn as the profile costume they overlap with,
+// or as a costume of their own (`generalist`, `guide`, `statusline`).
+const BUILTIN_ROLE: Readonly<Record<string, string>> = {
+  Explore: 'explorer', explore: 'explorer', Plan: 'architect', plan: 'architect', 'web-fetch': 'researcher',
+  'general-purpose': 'generalist', claude: 'generalist', 'claude-code-guide': 'guide', 'statusline-setup': 'statusline',
+}
 // The brief's tag line, e.g. `Role: leaf; Profile: implementer`: the first match counts.
 const PROFILE_TAG = /\bProfile:\s*([a-z-]+)/i
 // The tools' schemas are advice to the model, not a check: what a call may ask
@@ -98,6 +104,7 @@ const STRINGS = {
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
       critic: 'critic', documenter: 'documenter', tester: 'tester', researcher: 'researcher', debugger: 'debugger',
       analyst: 'analyst', architect: 'architect', auditor: 'auditor', navigator: 'navigator', inspector: 'inspector',
+      generalist: 'generalist', guide: 'guide', statusline: 'statusline',
     },
     effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
@@ -136,6 +143,7 @@ const STRINGS = {
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
       critic: 'critic', documenter: 'documenter', tester: 'tester', researcher: 'researcher', debugger: 'debugger',
       analyst: 'analyst', architect: 'architect', auditor: 'auditor', navigator: 'navigator', inspector: 'inspector',
+      generalist: 'универсал', guide: 'гид', statusline: 'строка состояния',
     },
     effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
@@ -174,6 +182,7 @@ const STRINGS = {
       root: 'ראשי', manager: 'מנהל', explorer: 'חוקר', implementer: 'מיישם', validator: 'מאמת',
       critic: 'מבקר', documenter: 'מתעד', tester: 'בודק', researcher: 'מחקר', debugger: 'מנפה',
       analyst: 'אנליסט', architect: 'ארכיטקט', auditor: 'מבקר אבטחה', navigator: 'נווט', inspector: 'בוחן',
+      generalist: 'כללי', guide: 'מדריך', statusline: 'שורת מצב',
     },
     effort: { low: 'נמוך', medium: 'בינוני', high: 'גבוה', xhigh: 'גבוה מאוד', max: 'מקסימלי' },
   },
@@ -471,20 +480,20 @@ const tierOf = (type: string): string => {
 // The role a dispatched agent is drawn as, first match wins: (a) its type names a
 // profile (`implementer`, or `plugin:implementer`); (b) its brief carries a tag line
 // such as `Role: leaf; Profile: implementer`, the first `Profile:` counting; (c) a
-// `savvy-*` tier; else `other`. A tag naming no known profile falls through to (c).
+// built-in type (`Explore`, `general-purpose`, ...); (d) a `savvy-*` tier; else `other`. A tag naming no known profile falls through to (c).
 const roleOfSpawn = (type: string, prompt: string): string => {
   const bare = type.replace(/^[^:]*:/, '').trim().toLowerCase()
   if (PROFILES.includes(bare)) return bare
   const tag = PROFILE_TAG.exec(prompt)?.[1]?.toLowerCase() ?? ''
   if (PROFILES.includes(tag)) return tag
-  return tierOf(type)
+  const builtin = Object.hasOwn(BUILTIN_ROLE, type.replace(/^[^:]*:/, '').trim()) ? BUILTIN_ROLE[type.replace(/^[^:]*:/, '').trim()] : undefined
+  return builtin ?? tierOf(type)
 }
 
 // A run's role: what the spawn detected, else (runs stored before roles were) its tier.
 const roleOf = (a: AgentRun): string => a.role ?? tierOf(a.type)
 
-// A run's costume: its profile's, else the plain crab (savvy tiers and the built-in
-// Explore agent have no costume of their own since 0.4.0).
+// A run's costume: its role's, else the plain crab (savvy tiers have none since 0.4.0).
 const costumeOf = (a: AgentRun): string => {
   const role = roleOf(a)
   return Object.hasOwn(COSTUMES, role) ? role : 'other'
@@ -493,7 +502,10 @@ const costumeOf = (a: AgentRun): string => {
 // The word under a run's title: its role, or its type when it has none.
 const roleLabel = (a: AgentRun): string => {
   const role = roleOf(a)
-  return role === 'other' ? a.type : tierWord(role)
+  const bare = a.type.replace(/^[^:]*:/, '').trim()
+  // A built-in type shows its own name, so it is not mistaken for the profile it borrows.
+  if (role === 'other' || (Object.hasOwn(BUILTIN_ROLE, bare) && BUILTIN_ROLE[bare] === role)) return a.type
+  return tierWord(role)
 }
 
 const modelName = (id: string): string => {

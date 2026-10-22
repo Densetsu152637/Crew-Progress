@@ -31,6 +31,10 @@ export const PROFILE_COLOR: Record<string, string> = {
   auditor: '#16806A',
   navigator: '#E0588F',
   inspector: '#8E2F45',
+  // Claude Code's own agent types that have no workflow profile.
+  generalist: '#64748B',
+  guide: '#4DB6F0',
+  statusline: '#B0B34A',
 }
 
 // A tier's or a profile's accent; grey for anything else.
@@ -99,6 +103,11 @@ export const CRAB_CSS = `<style>
 @keyframes click{50%{transform:translate(1px,1px)}}
 .c-inspector.run .flash{animation:blink 1s steps(1) infinite}
 .c-inspector.run .note{animation:rise 1s steps(4) infinite}
+.c-generalist.run .spark{animation:blink .5s steps(1) infinite}
+.c-guide.run .flag{transform-origin:0 50%;animation:wave .5s ease-in-out infinite}
+@keyframes wave{50%{transform:scaleX(.6)}}
+.c-statusline.run .roller{animation:roll 1s ease-in-out infinite}
+@keyframes roll{50%{transform:translateX(-4px)}}
 @media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}
 </style>`
 
@@ -215,6 +224,29 @@ export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
     stamp(f, 11, 16, ['kkkkkkkk', 'kkkggkkk', 'kkgllgkk', 'kkgllgkk', 'kkkggkkk'], { k: '#3A3A3C', g: t, l: 'rgba(169,214,245,.85)' })
     f(12, 15, 2, 1, '#FFF4C2', 'flash')
     stamp(f, 26, 3, ['..kk', '..k.', '..k.', 'kkk.', 'kk..'], { k: t }, 'note')
+  },
+  // Generalist: a field cap with a spark badge and a backpack; the spark pulses.
+  generalist: (f, t) => {
+    crabBody(f)
+    stamp(f, 8, 5, ['..tttttttttt..', '.tttttttttttt.', 'tttttttttttttt', 'bbbbbbbbbbbbbbbb'], { t, b: '#475569' })
+    f(14, 5, 2, 1, '#FF9A3C', 'spark'); f(14, 7, 2, 1, '#FF9A3C', 'spark'); f(13, 6, 4, 1, '#FF9A3C', 'spark')
+    stamp(f, 0, 8, ['tttttt', 'tbbbbt', 'tbbbbt', 'tttttt', 'tbbbbt'], { t, b: '#94A3B8' })
+    f(6, 11, 2, 1, '#475569'); f(6, 13, 2, 1, '#475569')
+  },
+  // Guide: a sun hat and a tour flag on a pole; the flag waves.
+  guide: (f, t) => {
+    crabBody(f, -4)
+    stamp(f, 5, 3, ['.....hhhhhhhhhh.....', '.....hhhhhhhhhh.....', '.....tttttttttt.....', 'bbbbbbbbbbbbbbbbbbbbb', '.bbbbbbbbbbbbbbbbbbb.'], { h: '#E8D08A', t, b: '#D9BC6A' })
+    f(25, 0, 1, 13, '#8B5A2B')
+    f(26, 0, 4, 5, t, 'flag'); f(27, 1, 2, 1, '#FFFFFF', 'flag'); f(27, 3, 2, 1, '#FFFFFF', 'flag')
+  },
+  // Statusline: a paint roller that rolls over the status bar it is painting.
+  statusline: (f, t) => {
+    crabBody(f, -4)
+    stamp(f, 3, 3, ['kkkkkkkkkkkkkkkk', 'kttttttwwwwwwwwk', 'kttttttwwwwwwwwk', 'kkkkkkkkkkkkkkkk'], { k: '#3A3A3C', t, w: '#8E929A' })
+    f(8, 6, 1, 1, '#FFFFFF'); f(10, 6, 1, 1, '#FFFFFF')
+    f(25, 5, 1, 9, '#6E7178', 'roller'); f(22, 7, 4, 1, '#6E7178', 'roller')
+    f(22, 1, 7, 3, t, 'roller'); f(22, 4, 7, 1, '#7C8035', 'roller'); f(22, 0, 7, 1, '#D8DB8A', 'roller')
   },
   other: f => crabBody(f),
 }
