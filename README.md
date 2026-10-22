@@ -7,6 +7,28 @@ A Claude Code mod: a live panel of your crew (the main session plus every subage
 
 Everything else works as in savvy-progress: running, finished and planned subagents with model, effort, task progress, context, estimated cost and time; the savvy-flow tiers and their costumes; the progress bar for orchestrated flows.
 
+## Costume gallery
+
+Every crab the mod ships, as it looks while its agent runs (`prefers-reduced-motion` stops the animation). The images are generated from the drawing code; see [Development](#development).
+
+| Crab | Costume | What it is | Defined by |
+| --- | --- | --- | --- |
+| <img src="media/costumes/root.svg" width="102" alt="root crab"> | Main session (root) | gold crown with jewels; the jewels sparkle | [workflows/AGENTS.root.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/workflows/AGENTS.root.md) |
+| <img src="media/costumes/manager.svg" width="102" alt="manager crab"> | manager profile | headset with mic and a conductor's baton; the baton conducts | [workflows/AGENTS.manager.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/workflows/AGENTS.manager.md) |
+| <img src="media/costumes/explorer.svg" width="102" alt="explorer crab"> | explorer profile | pith helmet and a lantern; the lantern swings | [profiles/AGENTS.explorer.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/profiles/AGENTS.explorer.md) |
+| <img src="media/costumes/implementer.svg" width="102" alt="implementer crab"> | implementer profile | bandana and a claw hammer; the hammer strikes | [profiles/AGENTS.implementer.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/profiles/AGENTS.implementer.md) |
+| <img src="media/costumes/validator.svg" width="102" alt="validator crab"> | validator profile | visor cap and a clipboard; the check mark blinks | [profiles/AGENTS.validator.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/profiles/AGENTS.validator.md) |
+| <img src="media/costumes/critic.svg" width="102" alt="critic crab"> | critic profile | beret and a gold monocle; the monocle glints | [profiles/AGENTS.critic.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/profiles/AGENTS.critic.md) |
+| <img src="media/costumes/documenter.svg" width="102" alt="documenter crab"> | documenter profile | scroll and a quill; the quill writes | [profiles/AGENTS.documenter.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/profiles/AGENTS.documenter.md) |
+| <img src="media/costumes/tester.svg" width="102" alt="tester crab"> | tester profile | lab goggles and a flask; the bubbles rise | [profiles/AGENTS.tester.md](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/profiles/AGENTS.tester.md) |
+| <img src="media/costumes/fable.svg" width="102" alt="fable crab"> | savvy-flow tier fable | astronaut in a glass dome; floats, the antenna and star blink | [savvy-flow](https://github.com/johnnyvizz/claude-kit) tier |
+| <img src="media/costumes/heavy.svg" width="102" alt="heavy crab"> | savvy-flow tier heavy | detective in a deerstalker; the magnifier sweeps and glints | [savvy-flow](https://github.com/johnnyvizz/claude-kit) tier |
+| <img src="media/costumes/careful.svg" width="102" alt="careful crab"> | savvy-flow tier careful | engineer in a hard hat; the wrench turns a bolt | [savvy-flow](https://github.com/johnnyvizz/claude-kit) tier |
+| <img src="media/costumes/medium.svg" width="102" alt="medium crab"> | savvy-flow tier medium | chef in a toque; tosses the omelette | [savvy-flow](https://github.com/johnnyvizz/claude-kit) tier |
+| <img src="media/costumes/light.svg" width="102" alt="light crab"> | savvy-flow tier light | racer in a helmet; runs at double pace, the flag flutters | [savvy-flow](https://github.com/johnnyvizz/claude-kit) tier |
+| <img src="media/costumes/explore.svg" width="102" alt="explore crab"> | built-in Explore agent | pirate with a cutlass; the cutlass fences | Claude Code's `Explore` agent type |
+| <img src="media/costumes/other.svg" width="102" alt="other crab"> | any other agent | the plain crab; walks | fallback |
+
 ## Install
 
 At the prompt of a terminal session:
@@ -46,20 +68,11 @@ The cost is an estimate and counts only requests made while the mod is loaded: r
 A subagent's costume is picked in this order, the first match winning:
 
 1. Its agent type is a profile name, e.g. `implementer` or `my-plugin:implementer`.
-2. Its brief carries a tag such as `Role: leaf; Profile: implementer` anywhere in it; the first `Profile:` counts.
+2. Its brief carries a tag such as `Role: leaf; Profile: implementer` anywhere in it ([the brief tag convention](https://github.com/Densetsu152637/Agent-Custom-Workflow/blob/main/templates/subagent-brief.md#compact-schema)); the first `Profile:` counts.
 3. Its type is a savvy-flow tier (`savvy-careful`, ...), drawn as in savvy-progress.
 4. Otherwise the plain crab, labelled with its agent type (the built-in Explore agent keeps its pirate).
 
-| Profile | Costume | Motion while running |
-| --- | --- | --- |
-| root (main session) | gold crown with jewels | jewels sparkle |
-| manager | headset with mic, conductor's baton | baton conducts |
-| explorer | pith helmet, lantern | lantern swings |
-| implementer | bandana, claw hammer | hammer strikes |
-| validator | visor cap, clipboard with a check mark | check mark blinks |
-| critic | beret, gold monocle | monocle glints |
-| documenter | scroll and quill | quill writes |
-| tester | lab goggles, bubbling flask | bubbles rise |
+The profiles are those of [Agent-Custom-Workflow](https://github.com/Densetsu152637/Agent-Custom-Workflow); the [costume gallery](#costume-gallery) shows each one and links its profile file.
 
 The profile's name appears under the agent's title, where savvy-flow agents show their tier. `prefers-reduced-motion` stops every animation.
 
@@ -87,6 +100,13 @@ Set them in `/config`, or in `~/.claude/settings.json`:
 ## Development
 
 `claude plugin validate .` checks the manifest and the hooks module; `claude plugin test .` runs the tests in `hooks/*.test.ts(x)`.
+
+The crab drawings live in `hooks/crabs.ts` (pixel grids, `COSTUMES`, `CRAB_CSS`), which `hooks/register.tsx` imports. After changing a costume, regenerate the gallery images with Node 22.18 or later, which runs the TypeScript directly:
+
+```
+node tools/render-costumes.mjs          # writes media/costumes/<costume>.svg, one per COSTUMES entry
+node tools/render-costumes.mjs --check  # exits 1 when an image is missing, stale or has no costume
+```
 
 ## Credits and licence
 
