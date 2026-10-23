@@ -1115,6 +1115,10 @@ export const register: Register = (on, options) => {
     // On the desktop, a subagent's row opens its transcript in the main view, as
     // the tasks list does; the row already in view takes the person back to the main one.
     const viewed = e.props.view?.agentId
+    const showMain = async () => {
+      const shown = await $.ui.view({})
+      if (shown.deny) await $.ui.toast(shown.deny)
+    }
     const viewButton = (a: AgentRun) => {
       const id = a.agentId
       if (!id) return null
@@ -1126,12 +1130,17 @@ export const register: Register = (on, options) => {
           plain
           dimColor
           onPress={async () => {
-            const shown = await $.ui.view(isViewed ? {} : { agentId: id })
+            if (isViewed) return showMain()
+            const shown = await $.ui.view({ agentId: id })
             if (shown.deny) await $.ui.toast(shown.deny)
           }}
         />
       )
     }
+    // While a subagent is in view, the main session's row offers the way back too.
+    const mainButton = viewed ? (
+      <Button key="view-main" label={`${isRtl() ? '›' : '‹'} ${s.backToMain}`} plain dimColor onPress={showMain} />
+    ) : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtInOut(t)}, ${fmtTime(t.time)}`
 
@@ -1157,7 +1166,7 @@ export const register: Register = (on, options) => {
       }
       const shownDone = p.isDoneCollapsed ? 0 : finished.length
       const lines = 1 + (isEmpty ? 1 : 0) + (running.length > 0 ? 1 : 0) + (finished.length > 0 ? 1 : 0) + (planned.length > 0 ? 1 : 0)
-      const viewable = [...running, ...(p.isDoneCollapsed ? [] : finished)].filter(a => a.agentId).length
+      const viewable = [...running, ...(p.isDoneCollapsed ? [] : finished)].filter(a => a.agentId).length + (main && mainButton ? 1 : 0)
       const gridH = headerHeight(title) + (lines + viewable) * LINE_H + ((main ? 1 : 0) + running.length + shownDone) * 66 + planned.length * 46
       return (
         <Box flexDirection="column">
@@ -1178,6 +1187,7 @@ export const register: Register = (on, options) => {
                 height={66}
               />
             )}
+            {main && mainButton}
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
             {running.flatMap(a => [

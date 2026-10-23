@@ -54,6 +54,22 @@ test('view: the row in view goes back to the main conversation', async ($, on) =
   expect(views).toEqual([{}])
 })
 
+test("view: while a subagent is in view, the main row goes back too", async ($, on) => {
+  const views: unknown[] = []
+  await session($, on, views)
+  const ui = await mount($, 'desktop', { agentId: 'a1' })
+  const back = await ui.find({ type: 'Button', key: 'view-main' })
+  expect(back?.props.label).toBe('‹ Back to main')
+  await ui.press({ key: 'view-main' })
+  expect(views).toEqual([{}])
+})
+
+test('view: with the main conversation in view, the main row has no button', async ($, on) => {
+  await session($, on, [])
+  const ui = await mount($, 'desktop')
+  expect(await ui.findAll({ type: 'Button', key: 'view-main' })).toHaveLength(0)
+})
+
 test('view: the terminal panel draws no open button', async ($, on) => {
   await session($, on, [])
   const ui = await mount($, 'terminal')
