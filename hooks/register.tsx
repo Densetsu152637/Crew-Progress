@@ -634,6 +634,9 @@ const toolLine = (use: { tool: string; input: Record<string, unknown> }): string
 
 // The pane's rows the thread's header (the back button) takes; the thread has the rest.
 const THREAD_HEADER_ROWS = 2
+// Rows the thread view runs past the pane's body: the desktop reports the wheel only
+// over a body with something to scroll, so the view keeps one row of it in hand.
+const THREAD_SPARE_ROWS = 1
 // The agent's own row atop its thread, in rows of the pane.
 const THREAD_ROW_ROWS = 4
 
@@ -1146,7 +1149,7 @@ export const register: Register = (on, options) => {
   let thread: { blocks: readonly ThreadBlock[]; rows: number } = { blocks: [], rows: 0 }
 
   // Under a thread's fixed header the thread scrolls itself, block by block, and the
-  // pane's own window stays put. At the newest block it follows the ones that arrive.
+  // pane's own window is held at its top. At the newest block it follows the ones that arrive.
   on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     const p = await read($, panel)
     const last = thread.blocks.length - 1
@@ -1160,7 +1163,7 @@ export const register: Register = (on, options) => {
       end += step
     }
     await update($, panel, prev => ({ ...prev, threadEnd: end >= last ? undefined : end }))
-    return {}
+    return next({ ...e, offset: 0 })
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -1286,6 +1289,7 @@ export const register: Register = (on, options) => {
                 </Box>
               ))}
             </Box>
+            <Box height={THREAD_SPARE_ROWS} flexShrink={0} />
           </Box>
         )
       }
