@@ -102,7 +102,6 @@ const STRINGS = {
     ctx: 'ctx',
     main: 'Main session',
     isIdle: 'idle',
-    openThread: 'Open thread',
     backToAgents: 'Agents',
     noThread: 'No messages yet.',
     tier: {
@@ -146,7 +145,6 @@ const STRINGS = {
     ctx: 'ctx',
     main: 'Основная сессия',
     isIdle: 'ожидает',
-    openThread: 'Открыть ветку',
     backToAgents: 'Агенты',
     noThread: 'Сообщений пока нет.',
     tier: {
@@ -190,7 +188,6 @@ const STRINGS = {
     ctx: 'הקשר',
     main: 'השיחה הראשית',
     isIdle: 'ממתין',
-    openThread: 'פתיחת השרשור',
     backToAgents: 'סוכנים',
     noThread: 'עדיין אין הודעות.',
     tier: {
@@ -669,7 +666,8 @@ const progressOf = (a: AgentRun): number | null => {
 
 const ctxOf = (a: AgentRun): number => (a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0)
 
-const agentSvg = (W: number, a: AgentRun, at: number): string => {
+// `titled: false` leaves the title out, for a row whose title is drawn as a pressable over it.
+const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => {
   const s = tr()
   const color = colorOf(roleOf(a))
   const ctx = ctxOf(a)
@@ -688,7 +686,7 @@ const agentSvg = (W: number, a: AgentRun, at: number): string => {
     W,
     66,
     `${rowCrab(W, 0, 14, costumeOf(a), false, a.status === 'running')}
-<text class="t" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>
+${titled ? `<text class="t" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
 <text ${startText(W, 42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" ${startText(W, 42, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
 <text class="s" ${endText(W, 42 + barW, 49, true)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
@@ -1127,18 +1125,6 @@ export const register: Register = (on, options) => {
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
     )
-    // On the desktop, a subagent's row opens its thread in the pane, in place of
-    // the agents; the desktop app keeps its main view to itself.
-    const viewButton = (a: AgentRun) =>
-      a.agentId ? (
-        <Button
-          key={`view-${a.id}`}
-          label={`${s.openThread} ${isRtl() ? '‹' : '›'}`}
-          plain
-          dimColor
-          onPress={() => update($, panel, prev => ({ ...prev, viewing: a.id }))}
-        />
-      ) : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtInOut(t)}, ${fmtTime(t.time)}`
 
@@ -1153,6 +1139,27 @@ export const register: Register = (on, options) => {
 
       // In Hebrew the column hugs the right edge: section heads and buttons right-aligned.
       const align = isRtl() ? 'flex-end' : undefined
+
+      // A subagent's row: pressing its title opens its thread in the pane, in place
+      // of the agents (the desktop app keeps its main view to itself). Neither an
+      // Svg nor a Box takes a press, so the title is a Button laid over the row.
+      const agentRow = (a: AgentRun, state: string) => {
+        const alt = `${a.description}: ${modelName(a.model)}, ${state}`
+        if (!a.agentId) return <Svg key={a.id} source={agentSvg(W, a, at)} alt={alt} width={W} height={66} />
+        return (
+          <Box key={`row-${a.id}`}>
+            <Svg source={agentSvg(W, a, at, false)} alt={alt} width={W} height={66} />
+            <Box position="absolute" top={0} left={isRtl() ? 0 : 5} right={isRtl() ? 5 : 0} alignItems={isRtl() ? 'flex-end' : 'flex-start'}>
+              <Button
+                key={`view-${a.id}`}
+                label={fitText(a.description || a.type, 13, W - 42 - 22)}
+                plain
+                onPress={() => update($, panel, prev => ({ ...prev, viewing: a.id }))}
+              />
+            </Box>
+          </Box>
+        )
+      }
 
       // A subagent's thread in place of the agents, its row on top and a way back above it.
       const viewing = p.viewing ? list.find(a => a.id === p.viewing) : undefined
@@ -1194,8 +1201,7 @@ export const register: Register = (on, options) => {
       }
       const shownDone = p.isDoneCollapsed ? 0 : finished.length
       const lines = 1 + (isEmpty ? 1 : 0) + (running.length > 0 ? 1 : 0) + (finished.length > 0 ? 1 : 0) + (planned.length > 0 ? 1 : 0)
-      const viewable = [...running, ...(p.isDoneCollapsed ? [] : finished)].filter(a => a.agentId).length
-      const gridH = headerHeight(title) + (lines + viewable) * LINE_H + ((main ? 1 : 0) + running.length + shownDone) * 66 + planned.length * 46
+      const gridH = headerHeight(title) + lines * LINE_H + ((main ? 1 : 0) + running.length + shownDone) * 66 + planned.length * 46
       return (
         <Box flexDirection="column">
           {/* The grid sizes the pane; the content is placed over it, as an
@@ -1217,16 +1223,10 @@ export const register: Register = (on, options) => {
             )}
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
-            {running.flatMap(a => [
-              <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isRunning}`} width={W} height={66} />,
-              viewButton(a),
-            ])}
+            {running.map(a => agentRow(a, s.isRunning))}
             {finished.length > 0 && toggleDone}
             {!p.isDoneCollapsed &&
-              finished.flatMap(a => [
-                <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />,
-                viewButton(a),
-              ])}
+              finished.map(a => agentRow(a, s.isFinished))}
             {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
             {planned.map(pl => (
               <Svg key={`plan-${pl.n}`} source={plannedSvg(W, pl)} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />

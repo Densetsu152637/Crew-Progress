@@ -41,10 +41,13 @@ const session = async ($: Engine, on: On, messages: unknown = THREAD) => {
 const mount = ($: Engine, surface: 'terminal' | 'desktop') =>
   $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: 'crew-agents', props: pane })
 
-test("view: a subagent's row opens its thread in place of the agents", async ($, on) => {
+test("view: pressing a subagent's row opens its thread in place of the agents", async ($, on) => {
   await session($, on)
   const ui = await mount($, 'desktop')
-  expect((await ui.find({ type: 'Button', key: 'view-a1' }))?.props.label).toBe('Open thread ›')
+  // The row's title is the pressable: no separate open button, no title in the row's drawing.
+  expect((await ui.find({ type: 'Button', key: 'view-a1' }))?.props.label).toBe('Side work')
+  const row = await ui.find({ type: 'Svg', alt: /^Side work:/ })
+  expect(String(row?.props.source)).not.toContain('>Side work<')
   await ui.press({ key: 'view-a1' })
 
   // The mounted pane redraws on the press: the same mount now shows the thread.
@@ -80,7 +83,7 @@ test('view: an empty thread says so', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /No messages yet/ })).toBeDefined()
 })
 
-test('view: the terminal panel draws no open button', async ($, on) => {
+test("view: the terminal panel's rows open nothing", async ($, on) => {
   await session($, on)
   const ui = await mount($, 'terminal')
   expect(await ui.findAll({ type: 'Button', key: 'view-a1' })).toHaveLength(0)
