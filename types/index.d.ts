@@ -34,6 +34,8 @@ export type AgentRun = {
   status: AgentStatus
   startedAt: number
   endedAt?: number
+  /** Time spent finished between runs of a reused agent, left out of its elapsed time. */
+  idleMs?: number
   contextTokens: number
   contextMax: number
   /** Prompt-side tokens summed over requests, cache reads and writes included. */

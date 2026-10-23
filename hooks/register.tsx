@@ -546,7 +546,14 @@ const fmtTime = (ms: number): string => {
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-const elapsed = (a: AgentRun, at: number): number => (a.endedAt ?? Math.max(at, a.startedAt)) - a.startedAt
+const elapsed = (a: AgentRun, at: number): number => (a.endedAt ?? Math.max(at, a.startedAt)) - a.startedAt - (a.idleMs ?? 0)
+
+// A finished run reused (resumed by a message, a turn started in its loop) is running
+// again: its totals stay, and the time it sat finished is left out of its elapsed time.
+const reactivated = (a: AgentRun, at: number): AgentRun =>
+  a.status === 'running'
+    ? a
+    : { ...a, status: 'running', endedAt: undefined, idleMs: (a.idleMs ?? 0) + (a.endedAt === undefined ? 0 : Math.max(0, at - a.endedAt)) }
 
 type Planned = PlannedTask & { n: number }
 
@@ -973,6 +980,12 @@ export const register: Register = (on, options) => {
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
+    const resumed = e.resume?.agentId
+    if (resumed && (await read($, agents)).some(a => a.agentId === resumed)) {
+      await update($, agents, list => list.map(a => (a.agentId === resumed ? reactivated(a, at) : a)))
+      await update($, now, () => at)
+      return started
+    }
     await update($, agents, list => {
       const round = 1 + list.filter(a => norm(a.description) === norm(e.description) && e.description).length
       const run: AgentRun = {
@@ -1004,12 +1017,17 @@ export const register: Register = (on, options) => {
     return started
   })
 
-  // The main loop's turn: its row walks while it runs.
+  // A turn starts: the main loop's row walks while it runs, and a subagent's finished
+  // row, its agent reused, is running again.
   on('turn.start', async ($, e, next) => {
     const started = await next(e)
-    if (e.agentId === undefined) {
-      const at = await $.clock.now()
+    const agentId = e.agentId
+    const at = await $.clock.now()
+    if (agentId === undefined) {
       await update($, root, (prev): AgentRun => ({ ...(prev ?? newRoot(at)), status: 'running' }))
+      await update($, now, () => at)
+    } else if ((await read($, agents)).some(a => a.agentId === agentId && a.status !== 'running')) {
+      await update($, agents, list => list.map(a => (a.agentId === agentId ? reactivated(a, at) : a)))
       await update($, now, () => at)
     }
     return started
