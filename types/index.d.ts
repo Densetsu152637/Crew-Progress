@@ -52,6 +52,8 @@ export type Panel = {
   isCompact: boolean
   isDoneCollapsed: boolean
   autoOpenedFor: string
+  /** The run whose thread the desktop pane shows in place of the agents; '' for none. */
+  viewing?: string
 }
 
 declare module 'claude-code' {

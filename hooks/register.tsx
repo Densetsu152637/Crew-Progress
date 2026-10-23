@@ -14,6 +14,7 @@ const panel = atom({ plugin: 'crew-progress', key: 'panel' } as const, {
   isCompact: false,
   isDoneCollapsed: false,
   autoOpenedFor: '',
+  viewing: '',
 })
 const now = atom({ plugin: 'crew-progress', key: 'now' } as const, 0)
 // The main session's own usage, drawn as the panel's pinned first row.
@@ -101,8 +102,9 @@ const STRINGS = {
     ctx: 'ctx',
     main: 'Main session',
     isIdle: 'idle',
-    openTask: 'Open task',
-    backToMain: 'Back to main',
+    openThread: 'Open thread',
+    backToAgents: 'Agents',
+    noThread: 'No messages yet.',
     tier: {
       light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
@@ -144,8 +146,9 @@ const STRINGS = {
     ctx: 'ctx',
     main: 'Основная сессия',
     isIdle: 'ожидает',
-    openTask: 'Открыть задачу',
-    backToMain: 'К основной сессии',
+    openThread: 'Открыть ветку',
+    backToAgents: 'Агенты',
+    noThread: 'Сообщений пока нет.',
     tier: {
       light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
@@ -187,8 +190,9 @@ const STRINGS = {
     ctx: 'הקשר',
     main: 'השיחה הראשית',
     isIdle: 'ממתין',
-    openTask: 'פתיחת המשימה',
-    backToMain: 'חזרה לשיחה הראשית',
+    openThread: 'פתיחת השרשור',
+    backToAgents: 'סוכנים',
+    noThread: 'עדיין אין הודעות.',
     tier: {
       light: 'קל', medium: 'בינוני', careful: 'זהיר', heavy: 'כבד', fable: 'פייבל', other: 'אחר',
       root: 'ראשי', manager: 'מנהל', explorer: 'חוקר', implementer: 'מיישם', validator: 'מאמת',
@@ -619,6 +623,17 @@ const crabWidth = (scale: number): number => Math.round(CRAB_BOX * scale * 100) 
 // A panel crab at x in a row of width W: on the mirrored side and facing left in Hebrew.
 const rowCrab = (W: number, x: number, y: number, costume: string, dim = false, isWalking = false): string =>
   crab(mx(W, x, crabWidth(CRAB_SCALE)), y, costume, dim, isWalking, CRAB_SCALE, isRtl())
+
+// A thread in the pane: its newest messages, each cut to a length one drawing holds.
+const THREAD_MESSAGES = 80
+const THREAD_TEXT = 4000
+
+// One line per tool call in a thread: the tool, and the argument that says most about it.
+const toolLine = (use: { tool: string; input: Record<string, unknown> }): string => {
+  const arg = ['description', 'file_path', 'path', 'command', 'pattern', 'url', 'query'].map(k => use.input[k]).find(v => typeof v === 'string' && v)
+  const name = use.tool.startsWith('mcp__') ? use.tool.split('__').slice(2).join('__') || use.tool : use.tool
+  return typeof arg === 'string' ? `${name} · ${arg.replace(/\s+/g, ' ')}` : name
+}
 
 const svg = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${CRAB_CSS}${body}</svg>`
@@ -1112,40 +1127,23 @@ export const register: Register = (on, options) => {
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
     )
-    // On the desktop, a subagent's row opens its transcript in the main view, as
-    // the tasks list does; the row already in view takes the person back to the main one.
-    const viewed = e.props.view?.agentId
-    const showMain = async () => {
-      const shown = await $.ui.view({})
-      if (shown.deny) await $.ui.toast(shown.deny)
-    }
-    const viewButton = (a: AgentRun) => {
-      const id = a.agentId
-      if (!id) return null
-      const isViewed = id === viewed
-      return (
+    // On the desktop, a subagent's row opens its thread in the pane, in place of
+    // the agents; the desktop app keeps its main view to itself.
+    const viewButton = (a: AgentRun) =>
+      a.agentId ? (
         <Button
           key={`view-${a.id}`}
-          label={isViewed ? `${isRtl() ? '›' : '‹'} ${s.backToMain}` : `${s.openTask} ${isRtl() ? '‹' : '›'}`}
+          label={`${s.openThread} ${isRtl() ? '‹' : '›'}`}
           plain
           dimColor
-          onPress={async () => {
-            if (isViewed) return showMain()
-            const shown = await $.ui.view({ agentId: id })
-            if (shown.deny) await $.ui.toast(shown.deny)
-          }}
+          onPress={() => update($, panel, prev => ({ ...prev, viewing: a.id }))}
         />
-      )
-    }
-    // While a subagent is in view, the main session's row offers the way back too.
-    const mainButton = viewed ? (
-      <Button key="view-main" label={`${isRtl() ? '›' : '‹'} ${s.backToMain}`} plain dimColor onPress={showMain} />
-    ) : null
+      ) : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtInOut(t)}, ${fmtTime(t.time)}`
 
     if (e.surface === 'desktop' && 'Svg' in ui) {
-      const { Svg } = ui
+      const { Svg, Markdown } = ui
       const W = Math.max(240, Math.min(900, (e.props.bodyColumns || 40) * 8 - 8))
       const section = (key: string, text: string) => (
         <Text key={key} dimColor>
@@ -1155,6 +1153,36 @@ export const register: Register = (on, options) => {
 
       // In Hebrew the column hugs the right edge: section heads and buttons right-aligned.
       const align = isRtl() ? 'flex-end' : undefined
+
+      // A subagent's thread in place of the agents, its row on top and a way back above it.
+      const viewing = p.viewing ? list.find(a => a.id === p.viewing) : undefined
+      if (viewing?.agentId) {
+        const found = await $.session.messages({ agentId: viewing.agentId })
+        const thread =
+          'deny' in found
+            ? [<Text key="deny" dimColor>{found.deny}</Text>]
+            : found.slice(-THREAD_MESSAGES).flatMap((m, i) => [
+                ...(m.text ? [<Markdown key={`m-${i}`} text={clip(m.text, THREAD_TEXT)} dimColor={m.role === 'user'} />] : []),
+                ...m.toolUses.map((u, j) => (
+                  <Text key={`t-${i}-${j}`} dimColor wrap="truncate-end">
+                    {`→ ${toolLine(u)}`}
+                  </Text>
+                )),
+              ])
+        return (
+          <Box flexDirection="column" gap={1} alignItems={align}>
+            <Button
+              key="back"
+              label={`${isRtl() ? '›' : '‹'} ${s.backToAgents}`}
+              plain
+              onPress={() => update($, panel, prev => ({ ...prev, viewing: '' }))}
+            />
+            <Svg source={agentSvg(W, viewing, at)} alt={`${viewing.description}: ${modelName(viewing.model)}`} width={W} height={66} />
+            {thread.length > 0 ? thread : <Text dimColor>{s.noThread}</Text>}
+          </Box>
+        )
+      }
+
       if (p.isCompact) {
         return (
           <Box flexDirection="column" alignItems={align}>
@@ -1166,7 +1194,7 @@ export const register: Register = (on, options) => {
       }
       const shownDone = p.isDoneCollapsed ? 0 : finished.length
       const lines = 1 + (isEmpty ? 1 : 0) + (running.length > 0 ? 1 : 0) + (finished.length > 0 ? 1 : 0) + (planned.length > 0 ? 1 : 0)
-      const viewable = [...running, ...(p.isDoneCollapsed ? [] : finished)].filter(a => a.agentId).length + (main && mainButton ? 1 : 0)
+      const viewable = [...running, ...(p.isDoneCollapsed ? [] : finished)].filter(a => a.agentId).length
       const gridH = headerHeight(title) + (lines + viewable) * LINE_H + ((main ? 1 : 0) + running.length + shownDone) * 66 + planned.length * 46
       return (
         <Box flexDirection="column">
@@ -1187,7 +1215,6 @@ export const register: Register = (on, options) => {
                 height={66}
               />
             )}
-            {main && mainButton}
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
             {running.flatMap(a => [

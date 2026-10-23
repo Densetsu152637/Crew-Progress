@@ -4,11 +4,18 @@ import type { Engine } from 'claude-code/testing'
 
 const PLUGIN = 'crew-progress'
 const NOW = Date.parse('2026-10-23T12:00:00Z')
-const pane = (view: { agentId?: string }) =>
-  ({ title: '', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view }) as const
+const pane = { title: '', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } as const
 
-// The engine beneath the plugin: one subagent `a1`, and every view the panel asks for kept in `views`.
-const session = async ($: Engine, on: On, views: unknown[], deny?: string) => {
+// Subagent a1's conversation: its brief, a reply with one tool call, the tool's result, its answer.
+const THREAD = [
+  { role: 'user', text: 'Check the build.', toolUses: [] },
+  { role: 'assistant', text: 'Looking at the config.', toolUses: [{ tool_use_id: 'u1', tool: 'Read', input: { file_path: '/repo/build.json' } }] },
+  { role: 'user', text: '', toolUses: [], toolResults: [{ tool_use_id: 'u1', text: '{}' }] },
+  { role: 'assistant', text: 'The build is fine.', toolUses: [] },
+]
+
+// The engine beneath the plugin: one subagent `a1`, whose thread `messages` answers.
+const session = async ($: Engine, on: On, messages: unknown = THREAD) => {
   mock.clock(on, { now: NOW })
   mock.env(on, { LANG: 'en_US.UTF-8' })
   on('settings.read', async () => ({ value: {} }) as never)
@@ -17,7 +24,7 @@ const session = async ($: Engine, on: On, views: unknown[], deny?: string) => {
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', async () => ({ cwd: '/repo' }) as never)
   on('agent.spawn', () => ({ model: 'claude-haiku-4-5', agentId: 'a1' }))
-  on('ui.view', (_$, e) => (views.push(e), { value: deny ? { deny } : {} }))
+  on('session.messages', (_$, e) => ({ value: (e.agentId === 'a1' ? messages : { deny: `no agent ${e.agentId}` }) as never }))
   await $.session.start({ source: 'startup', cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
   await $.agent.spawn({
     tool_use_id: 't1',
@@ -31,57 +38,50 @@ const session = async ($: Engine, on: On, views: unknown[], deny?: string) => {
   } as never)
 }
 
-const mount = ($: Engine, surface: 'terminal' | 'desktop', view: { agentId?: string } = {}) =>
-  $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: 'crew-agents', props: pane(view) })
+const mount = ($: Engine, surface: 'terminal' | 'desktop') =>
+  $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: 'crew-agents', props: pane })
 
-test("view: a subagent's row opens its task in the main view", async ($, on) => {
-  const views: unknown[] = []
-  await session($, on, views)
+test("view: a subagent's row opens its thread in place of the agents", async ($, on) => {
+  await session($, on)
   const ui = await mount($, 'desktop')
-  const open = await ui.find({ type: 'Button', key: 'view-a1' })
-  expect(open?.props.label).toBe('Open task ›')
+  expect((await ui.find({ type: 'Button', key: 'view-a1' }))?.props.label).toBe('Open thread ›')
   await ui.press({ key: 'view-a1' })
-  expect(views).toEqual([{ agentId: 'a1' }])
+
+  // The mounted pane redraws on the press: the same mount now shows the thread.
+  const thread = ui
+  expect((await thread.find({ type: 'Button', key: 'back' }))?.props.label).toBe('‹ Agents')
+  const texts = (await thread.findAll({ type: 'Markdown' })).map(el => String(el.props.text))
+  expect(texts).toEqual(['Check the build.', 'Looking at the config.', 'The build is fine.'])
+  expect(await thread.find({ type: 'Text', text: /→ Read · \/repo\/build\.json/ })).toBeDefined()
+  // The agents list is gone while the thread shows: only the viewed run's row is drawn.
+  expect((await thread.findAll({ type: 'Svg' })).map(el => String(el.props.alt))).toEqual(['Side work: Haiku 4.5'])
 })
 
-test('view: the row in view goes back to the main conversation', async ($, on) => {
-  const views: unknown[] = []
-  await session($, on, views)
-  const ui = await mount($, 'desktop', { agentId: 'a1' })
-  const back = await ui.find({ type: 'Button', key: 'view-a1' })
-  expect(back?.props.label).toBe('‹ Back to main')
+test('view: the back button returns to the agents', async ($, on) => {
+  await session($, on)
+  const ui = await mount($, 'desktop')
   await ui.press({ key: 'view-a1' })
-  expect(views).toEqual([{}])
+  await ui.press({ key: 'back' })
+  expect(await ui.findAll({ type: 'Button', key: 'back' })).toHaveLength(0)
+  expect(await ui.find({ type: 'Button', key: 'view-a1' })).toBeDefined()
 })
 
-test("view: while a subagent is in view, the main row goes back too", async ($, on) => {
-  const views: unknown[] = []
-  await session($, on, views)
-  const ui = await mount($, 'desktop', { agentId: 'a1' })
-  const back = await ui.find({ type: 'Button', key: 'view-main' })
-  expect(back?.props.label).toBe('‹ Back to main')
-  await ui.press({ key: 'view-main' })
-  expect(views).toEqual([{}])
+test('view: a thread the session cannot read says why', async ($, on) => {
+  await session($, on, { deny: 'no transcript for a1' })
+  const ui = await mount($, 'desktop')
+  await ui.press({ key: 'view-a1' })
+  expect(await ui.find({ type: 'Text', text: /no transcript for a1/ })).toBeDefined()
 })
 
-test('view: with the main conversation in view, the main row has no button', async ($, on) => {
+test('view: an empty thread says so', async ($, on) => {
   await session($, on, [])
   const ui = await mount($, 'desktop')
-  expect(await ui.findAll({ type: 'Button', key: 'view-main' })).toHaveLength(0)
+  await ui.press({ key: 'view-a1' })
+  expect(await ui.find({ type: 'Text', text: /No messages yet/ })).toBeDefined()
 })
 
 test('view: the terminal panel draws no open button', async ($, on) => {
-  await session($, on, [])
+  await session($, on)
   const ui = await mount($, 'terminal')
   expect(await ui.findAll({ type: 'Button', key: 'view-a1' })).toHaveLength(0)
-})
-
-test('view: a refused view is said in a toast', async ($, on) => {
-  const views: unknown[] = []
-  const toasts: unknown[] = []
-  on('ui.toast', (_$, e) => (toasts.push(e), { value: undefined }))
-  await session($, on, views, 'no agent holds the id')
-  const ui = await mount($, 'desktop')
-  await ui.press({ key: 'view-a1' })
-  expect(JSON.stringify(toasts)).toContain('no agent holds the id')
 })
