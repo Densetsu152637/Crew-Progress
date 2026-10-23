@@ -632,6 +632,58 @@ const toolLine = (use: { tool: string; input: Record<string, unknown> }): string
   return typeof arg === 'string' ? `${name} · ${arg.replace(/\s+/g, ' ')}` : name
 }
 
+// The pane's rows the thread's header (the back button) takes; the thread has the rest.
+const THREAD_HEADER_ROWS = 2
+// The agent's own row atop its thread, in rows of the pane.
+const THREAD_ROW_ROWS = 4
+
+// A thread is drawn as blocks, newest at the bottom: the agent's row, each message's
+// paragraphs (a fenced code block kept whole) and a line per tool call, each with the
+// rows it is reckoned to take. The pane scrolls a thread block by block.
+type ThreadBlock = { kind: 'row' | 'md' | 'tool'; text: string; isDim: boolean; rows: number }
+
+const paragraphs = (text: string): string[] => {
+  const out: string[] = []
+  let cur: string[] = []
+  let isFenced = false
+  for (const line of text.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) isFenced = !isFenced
+    if (!isFenced && line.trim() === '') {
+      if (cur.length) out.push(cur.join('\n'))
+      cur = []
+      continue
+    }
+    cur.push(line)
+  }
+  if (cur.length) out.push(cur.join('\n'))
+  return out
+}
+
+const rowsOf = (text: string, cols: number): number =>
+  text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil([...line].length / Math.max(1, cols))), 0)
+
+// The first block a window of `rows` shows when it ends at block `end`; one more
+// above it is drawn too, cut off at the window's top edge.
+const threadStart = (blocks: readonly ThreadBlock[], end: number, rows: number): number => {
+  let used = 0
+  let i = end
+  while (i >= 0 && used + (blocks[i]?.rows ?? 1) <= rows) {
+    used += (blocks[i]?.rows ?? 1) + 1
+    i--
+  }
+  return Math.max(0, Math.min(end, i))
+}
+
+// The lowest end a window can scroll up to: where it still shows the thread from its first block.
+const threadMinEnd = (blocks: readonly ThreadBlock[], rows: number): number => {
+  let used = 0
+  for (let i = 0; i < blocks.length; i++) {
+    used += (blocks[i]?.rows ?? 1) + 1
+    if (used >= rows) return i
+  }
+  return Math.max(0, blocks.length - 1)
+}
+
 const svg = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${CRAB_CSS}${body}</svg>`
 
@@ -778,23 +830,6 @@ const inputOf = (u: Usage): number => (u.input_tokens || 0) + (u.cache_read_inpu
 const rootRow = (r: AgentRun | null): AgentRun | null => (r ? { ...r, description: tr().main } : null)
 
 // Opens the agents pane, or closes it when it is up; true when it ends up open.
-// Moves the pane's window; a pane that cannot be scrolled (no surface, a test)
-// still shows what it holds, so a refusal or a throw is let go.
-async function scrollPane($: EngineInterface, to: 'start' | 'end'): Promise<void> {
-  try {
-    await $.ui.scroll({ in: PANE, to })
-  } catch {
-    // Nothing to move.
-  }
-}
-
-// A thread opens on its newest message and keeps up with the ones that follow,
-// as the pane's end does until the person scrolls away from it.
-async function openThread($: EngineInterface, id: string): Promise<void> {
-  await update($, panel, prev => ({ ...prev, viewing: id }))
-  await scrollPane($, 'end')
-}
-
 async function togglePane($: EngineInterface): Promise<boolean> {
   const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
   if (isOpen) {
@@ -1107,14 +1142,25 @@ export const register: Register = (on, options) => {
     return measured
   })
 
-  // Scrolled back down to a thread's end, the pane follows it again.
+  // The thread the pane last drew, which its scrolling moves over: blocks, window rows.
+  let thread: { blocks: readonly ThreadBlock[]; rows: number } = { blocks: [], rows: 0 }
+
+  // Under a thread's fixed header the thread scrolls itself, block by block, and the
+  // pane's own window stays put. At the newest block it follows the ones that arrive.
   on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
-    const moved = await next(e)
-    const isAtEnd = e.offset >= e.contentRows - e.bodyRows
-    if (!moved.deny && e.origin.kind === 'person' && e.by > 0 && isAtEnd && (await read($, panel)).viewing) {
-      void scrollPane($, 'end')
+    const p = await read($, panel)
+    const last = thread.blocks.length - 1
+    if (!p.viewing || last < 0) return next(e)
+    const minEnd = Math.min(last, threadMinEnd(thread.blocks, thread.rows))
+    const step = Math.sign(e.by)
+    let end = Math.min(last, Math.max(minEnd, p.threadEnd ?? last))
+    let left = Math.abs(e.by)
+    while (left > 0 && end + step >= minEnd && end + step <= last) {
+      left -= (thread.blocks[step > 0 ? end + 1 : end]?.rows ?? 1) + 1
+      end += step
     }
-    return moved
+    await update($, panel, prev => ({ ...prev, threadEnd: end >= last ? undefined : end }))
+    return {}
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -1181,51 +1227,65 @@ export const register: Register = (on, options) => {
                 key={`view-${a.id}`}
                 label={fitText(a.description || a.type, 13, W - 42 - 22)}
                 plain
-                onPress={() => openThread($, a.id)}
+                onPress={() => update($, panel, prev => ({ ...prev, viewing: a.id, threadEnd: undefined }))}
               />
             </Box>
           </Box>
         )
       }
 
-      // A subagent's thread in place of the agents, its row on top and a way back above it.
+      // A subagent's thread in place of the agents: a fixed row with the way back,
+      // and under it a window of the thread's blocks, newest at the bottom.
       const viewing = p.viewing ? list.find(a => a.id === p.viewing) : undefined
       if (viewing?.agentId) {
-        const back = (key: string) => (
-          <Button
-            key={key}
-            label={`${isRtl() ? '›' : '‹'} ${s.backToAgents}`}
-            plain
-            onPress={async () => {
-              await update($, panel, prev => ({ ...prev, viewing: '' }))
-              await scrollPane($, 'start')
-            }}
-          />
-        )
-        // Scrolled down, a second back button rides at the window's top row.
-        const offset = e.props.scroll.offset
         const found = await $.session.messages({ agentId: viewing.agentId })
-        const thread =
-          'deny' in found
-            ? [<Text key="deny" dimColor>{found.deny}</Text>]
-            : found.slice(-THREAD_MESSAGES).flatMap((m, i) => [
-                ...(m.text ? [<Markdown key={`m-${i}`} text={clip(m.text, THREAD_TEXT)} dimColor={m.role === 'user'} />] : []),
-                ...m.toolUses.map((u, j) => (
-                  <Text key={`t-${i}-${j}`} dimColor wrap="truncate-end">
-                    {`→ ${toolLine(u)}`}
-                  </Text>
-                )),
-              ])
+        const cols = Math.max(20, e.props.bodyColumns || 40)
+        const rows = Math.max(4, e.props.scroll.bodyRows - THREAD_HEADER_ROWS)
+        const blocks: ThreadBlock[] = [
+          { kind: 'row', text: '', isDim: false, rows: THREAD_ROW_ROWS },
+          ...('deny' in found
+            ? [{ kind: 'tool' as const, text: found.deny, isDim: true, rows: rowsOf(found.deny, cols) }]
+            : found.length === 0
+              ? [{ kind: 'tool' as const, text: s.noThread, isDim: true, rows: 1 }]
+              : found.slice(-THREAD_MESSAGES).flatMap(m => [
+                  ...paragraphs(m.text ? clip(m.text, THREAD_TEXT) : '').map(text => ({
+                    kind: 'md' as const,
+                    text,
+                    isDim: m.role === 'user',
+                    rows: rowsOf(text, cols),
+                  })),
+                  ...m.toolUses.map(u => ({ kind: 'tool' as const, text: `→ ${toolLine(u)}`, isDim: true, rows: 1 })),
+                ])),
+        ]
+        thread = { blocks, rows }
+        const last = blocks.length - 1
+        const end = Math.min(last, Math.max(threadMinEnd(blocks, rows), p.threadEnd ?? last))
+        const start = threadStart(blocks, end, rows)
         return (
-          <Box flexDirection="column" gap={1} alignItems={align}>
-            {back('back')}
-            <Svg source={agentSvg(W, viewing, at)} alt={`${viewing.description}: ${modelName(viewing.model)}`} width={W} height={66} />
-            {thread.length > 0 ? thread : <Text dimColor>{s.noThread}</Text>}
-            {offset > 0 && (
-              <Box position="absolute" top={offset} left={0} right={0} alignItems={align}>
-                {back('back-pinned')}
-              </Box>
-            )}
+          <Box flexDirection="column" alignItems={align}>
+            <Box height={THREAD_HEADER_ROWS} flexShrink={0} alignItems={align}>
+              <Button
+                key="back"
+                label={`${isRtl() ? '›' : '‹'} ${s.backToAgents}`}
+                plain
+                onPress={() => update($, panel, prev => ({ ...prev, viewing: '', threadEnd: undefined }))}
+              />
+            </Box>
+            <Box height={rows} overflow="hidden" flexDirection="column" justifyContent="flex-end" gap={1} alignItems={align}>
+              {blocks.slice(start, end + 1).map((b, i) => (
+                <Box key={`b-${start + i}`} flexShrink={0}>
+                  {b.kind === 'row' ? (
+                    <Svg source={agentSvg(W, viewing, at)} alt={`${viewing.description}: ${modelName(viewing.model)}`} width={W} height={66} />
+                  ) : b.kind === 'md' ? (
+                    <Markdown text={b.text} dimColor={b.isDim} />
+                  ) : (
+                    <Text dimColor wrap={b.rows > 1 ? 'wrap' : 'truncate-end'}>
+                      {b.text}
+                    </Text>
+                  )}
+                </Box>
+              ))}
+            </Box>
           </Box>
         )
       }
