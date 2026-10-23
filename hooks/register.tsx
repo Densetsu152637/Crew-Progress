@@ -694,13 +694,15 @@ ${statusMark(mx(W, W - 8), 16, 'planned', color)}
   )
 }
 
-const compactSvg = (W: number, list: AgentRun[], planned: Planned[], t: ReturnType<typeof totals>): string => {
+// Collapsed, the header's tiles stay and the rows shrink to one strip of crabs.
+const compactSvg = (W: number, list: AgentRun[], planned: Planned[]): string => {
   const icons = [
     ...list.filter(a => a.status === 'running').map(a => ({ k: costumeOf(a), c: colorOf(roleOf(a)), s: 'running', dim: false })),
     ...list.filter(a => a.status !== 'running').map(a => ({ k: costumeOf(a), c: colorOf(roleOf(a)), s: a.status, dim: false })),
     ...planned.map(p => ({ k: 'other', c: colorOf(p.tier), s: 'planned', dim: true })),
   ]
-  const fit = Math.max(1, Math.floor((W - 150) / 36))
+  // Room is kept for the "+N" overflow count.
+  const fit = Math.max(1, Math.floor((W - 36) / 36))
   const shown = icons.slice(0, fit)
   const more = icons.length - shown.length
   const body = shown
@@ -710,8 +712,7 @@ const compactSvg = (W: number, list: AgentRun[], planned: Planned[], t: ReturnTy
   return svg(
     W,
     32,
-    `${body}${more ? `<text class="s" ${startText(W, x, 21, false)} font-family="${FONT}" font-size="12">+${more}</text>` : ''}
-<text class="s" ${endText(W, W, 21)} font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">≈${fmtCost(t.cost)} · ${fmtInOut(t)} · ${fmtTime(t.time)}</text>`,
+    `${body}${more ? `<text class="s" ${startText(W, x, 21, false)} font-family="${FONT}" font-size="12">+${more}</text>` : ''}`,
   )
 }
 
@@ -1121,9 +1122,10 @@ export const register: Register = (on, options) => {
       const align = isRtl() ? 'flex-end' : undefined
       if (p.isCompact) {
         return (
-          <Box flexDirection="column" gap={1} alignItems={align}>
-            <Svg source={compactSvg(W, everyone, planned, t)} alt={`${list.length} ${s.agentsCount}, ${summary}`} width={W} height={32} />
+          <Box flexDirection="column" alignItems={align}>
+            <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
             {toggleCompact}
+            <Svg source={compactSvg(W, everyone, planned)} alt={`${list.length} ${s.agentsCount}`} width={W} height={32} />
           </Box>
         )
       }
