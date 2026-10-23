@@ -54,8 +54,6 @@ export type Panel = {
   autoOpenedFor: string
   /** The run whose thread the desktop pane shows in place of the agents; '' for none. */
   viewing?: string
-  /** The thread's last block in view while scrolled up from its end; absent, it follows the newest. */
-  threadEnd?: number
 }
 
 declare module 'claude-code' {

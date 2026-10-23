@@ -89,22 +89,22 @@ test("view: the terminal panel's rows open nothing", async ($, on) => {
   expect(await ui.findAll({ type: 'Button', key: 'view-a1' })).toHaveLength(0)
 })
 
-test('view: the back button sits in its own row above the thread', async ($, on) => {
+test('view: a second back button closes the thread, below its newest message', async ($, on) => {
   await session($, on)
   const ui = await mount($, 'desktop')
   await ui.press({ key: 'view-a1' })
   const tree = JSON.stringify(await ui.drawn())
-  // The header row comes before the thread's clipped window, and nothing is laid over it.
-  expect(tree.indexOf('"back"')).toBeLessThan(tree.indexOf('Check the build.'))
-  expect(tree).not.toContain('"absolute"')
+  expect(tree.indexOf('"back-end"')).toBeGreaterThan(tree.indexOf('The build is fine.'))
+  await ui.press({ key: 'back-end' })
+  expect(await ui.findAll({ type: 'Button', key: 'back' })).toHaveLength(0)
 })
 
-test('view: a long thread shows its newest messages at the bottom', async ($, on) => {
-  const long = Array.from({ length: 60 }, (_, i) => ({ role: 'assistant', text: `Message ${i}.`, toolUses: [] }))
+test('view: a long thread keeps its newest messages within one drawing', async ($, on) => {
+  const long = Array.from({ length: 60 }, (_, i) => ({ role: 'assistant', text: `${i}: ${'x'.repeat(3000)}`, toolUses: [] }))
   await session($, on, long)
   const ui = await mount($, 'desktop')
   await ui.press({ key: 'view-a1' })
   const texts = (await ui.findAll({ type: 'Markdown' })).map(el => String(el.props.text))
-  expect(texts.at(-1)).toBe('Message 59.')
-  expect(texts).not.toContain('Message 0.')
+  expect(texts.at(-1)?.startsWith('59: ')).toBe(true)
+  expect(texts.some(t => t.startsWith('0: '))).toBe(false)
 })
