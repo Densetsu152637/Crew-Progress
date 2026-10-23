@@ -88,3 +88,14 @@ test("view: the terminal panel's rows open nothing", async ($, on) => {
   const ui = await mount($, 'terminal')
   expect(await ui.findAll({ type: 'Button', key: 'view-a1' })).toHaveLength(0)
 })
+
+test('view: scrolled down, a second back button rides at the top of the window', async ($, on) => {
+  await session($, on)
+  const ui = await mount($, 'desktop')
+  await ui.press({ key: 'view-a1' })
+  expect(await ui.findAll({ type: 'Button', key: 'back-pinned' })).toHaveLength(0)
+  await ui.redraw({ ...pane, scroll: { offset: 12, bodyRows: 30 } })
+  expect(await ui.find({ type: 'Button', key: 'back-pinned' })).toBeDefined()
+  await ui.press({ key: 'back-pinned' })
+  expect(await ui.findAll({ type: 'Button', key: 'back' })).toHaveLength(0)
+})
