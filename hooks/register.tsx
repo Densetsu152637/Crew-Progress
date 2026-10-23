@@ -72,7 +72,8 @@ const STRINGS = {
   en: {
     pane: 'Agents',
     cost: 'Cost',
-    tokens: 'Tokens',
+    input: 'Input',
+    output: 'Output',
     time: 'Time',
     collapse: 'Collapse',
     expand: 'Expand',
@@ -83,7 +84,8 @@ const STRINGS = {
     round: 'round',
     failed: 'error',
     after: 'after',
-    tokensWord: 'tokens',
+    inWord: 'in',
+    outWord: 'out',
     agentsCount: 'agents',
     isRunning: 'running',
     isFinished: 'finished',
@@ -111,7 +113,8 @@ const STRINGS = {
   ru: {
     pane: 'Агенты',
     cost: 'Стоимость',
-    tokens: 'Токены',
+    input: 'Ввод',
+    output: 'Вывод',
     time: 'Время',
     collapse: 'Свернуть',
     expand: 'Развернуть',
@@ -122,7 +125,8 @@ const STRINGS = {
     round: 'раунд',
     failed: 'ошибка',
     after: 'после',
-    tokensWord: 'токенов',
+    inWord: 'вход',
+    outWord: 'выход',
     agentsCount: 'агентов',
     isRunning: 'работает',
     isFinished: 'завершён',
@@ -150,7 +154,8 @@ const STRINGS = {
   he: {
     pane: 'סוכנים',
     cost: 'עלות',
-    tokens: 'טוקנים',
+    input: 'קלט',
+    output: 'פלט',
     time: 'זמן',
     collapse: 'כיווץ',
     expand: 'הרחבה',
@@ -161,7 +166,8 @@ const STRINGS = {
     round: 'סבב',
     failed: 'שגיאה',
     after: 'אחרי',
-    tokensWord: 'טוקנים',
+    inWord: 'קלט',
+    outWord: 'פלט',
     agentsCount: 'סוכנים',
     isRunning: 'פועל',
     isFinished: 'הסתיים',
@@ -520,6 +526,9 @@ const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, 
 const fmtTokens = (n: number): string =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : `${Math.round(n)}`
 
+// "12M in · 45k out", the words in the panel's language.
+const fmtInOut = (t: { input: number; output: number }): string => `${fmtTokens(t.input)} ${tr().inWord} · ${fmtTokens(t.output)} ${tr().outWord}`
+
 const fmtCost = (usd: number): string => `$${usd < 10 ? usd.toFixed(2) : usd.toFixed(1)}`
 
 const fmtTime = (ms: number): string => {
@@ -542,10 +551,12 @@ const plannedOf = (f: Flow | null, list: AgentRun[]): Planned[] => {
 
 const totals = (list: AgentRun[], at: number) => {
   const cost = list.reduce((s, a) => s + a.costUsd, 0)
-  const tokens = list.reduce((s, a) => s + a.tokens, 0)
+  // `|| 0`: a row kept from before the split has neither count.
+  const input = list.reduce((s, a) => s + (a.inputTokens || 0), 0)
+  const output = list.reduce((s, a) => s + (a.outputTokens || 0), 0)
   const start = Math.min(...list.map(a => a.startedAt))
   const end = Math.max(...list.map(a => a.endedAt ?? Math.max(at, a.startedAt)))
-  return { cost, tokens, time: list.length ? end - start : 0 }
+  return { cost, input, output, time: list.length ? end - start : 0 }
 }
 
 // --- desktop drawings: each row is one SVG, as the band above the prompt is.
@@ -610,17 +621,19 @@ const svg = (W: number, H: number, body: string): string =>
 const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): string => {
   const s = tr()
   const gap = 6
-  const tw = (W - gap * 2) / 3
+  const tw = (W - gap * 3) / 4
+  // A narrow pane shrinks the figures so "≈$12.3" still fits its tile.
+  const size = tw >= 80 ? 15 : 13
   const top = title ? 28 : 0
   const tile = (i: number, k: string, v: string) =>
     `<rect class="tile" x="${mx(W, i * (tw + gap), tw)}" y="${top}" width="${tw}" height="40" rx="8"/>
 <text class="s" ${startText(W, i * (tw + gap) + 9, top + 16)} font-family="${FONT}" font-size="11">${k}</text>
-<text class="t" ${startText(W, i * (tw + gap) + 9, top + 33, false)} font-family="${FONT}" font-size="15" font-weight="600" font-variant-numeric="tabular-nums">${v}</text>`
+<text class="t" ${startText(W, i * (tw + gap) + 9, top + 33, false)} font-family="${FONT}" font-size="${size}" font-weight="600" font-variant-numeric="tabular-nums">${v}</text>`
   return svg(
     W,
     headerHeight(title),
     `${title ? `<text class="t" ${startText(W, 0, 15)} font-family="${FONT}" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>` : ''}
-${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.tokens, fmtTokens(t.tokens))}${tile(2, s.time, fmtTime(t.time))}`,
+${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.input, fmtTokens(t.input))}${tile(2, s.output, fmtTokens(t.output))}${tile(3, s.time, fmtTime(t.time))}`,
   )
 }
 
@@ -698,7 +711,7 @@ const compactSvg = (W: number, list: AgentRun[], planned: Planned[], t: ReturnTy
     W,
     32,
     `${body}${more ? `<text class="s" ${startText(W, x, 21, false)} font-family="${FONT}" font-size="12">+${more}</text>` : ''}
-<text class="s" ${endText(W, W, 21)} font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">≈${fmtCost(t.cost)} · ${fmtTokens(t.tokens)} · ${fmtTime(t.time)}</text>`,
+<text class="s" ${endText(W, W, 21)} font-family="${FONT}" font-size="12" font-variant-numeric="tabular-nums">≈${fmtCost(t.cost)} · ${fmtInOut(t)} · ${fmtTime(t.time)}</text>`,
   )
 }
 
@@ -724,7 +737,8 @@ const newRoot = (startedAt: number): AgentRun => ({
   startedAt,
   contextTokens: 0,
   contextMax: 0,
-  tokens: 0,
+  inputTokens: 0,
+  outputTokens: 0,
   costUsd: 0,
   steps: 0,
   round: 1,
@@ -737,8 +751,8 @@ const withContext = (r: AgentRun, c: SessionContextUsage): AgentRun => ({
   contextMax: c.window || r.contextMax,
 })
 
-const usageTokens = (u: Usage): number =>
-  (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0)
+// The prompt side, cache reads and writes included, as the status line counts the window.
+const inputOf = (u: Usage): number => (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0)
 
 // The row as drawn: its title in the panel's language.
 const rootRow = (r: AgentRun | null): AgentRun | null => (r ? { ...r, description: tr().main } : null)
@@ -933,7 +947,8 @@ export const register: Register = (on, options) => {
         startedAt: at,
         contextTokens: 0,
         contextMax: windowOf(started.model),
-        tokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
         costUsd: 0,
         steps: 0,
         round,
@@ -978,9 +993,10 @@ export const register: Register = (on, options) => {
           model,
           effort: typeof e.effort === 'string' ? e.effort : r.effort,
           // The input side, as the status line counts the window (SessionContextUsage.tokens).
-          contextTokens: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
+          contextTokens: inputOf(usage),
           contextMax: r.contextMax || windowOf(model),
-          tokens: r.tokens + usageTokens(usage),
+          inputTokens: (r.inputTokens || 0) + inputOf(usage),
+          outputTokens: (r.outputTokens || 0) + (usage.output_tokens || 0),
           costUsd: r.costUsd + costOf(model, usage, true),
           steps: r.steps + 1,
         }
@@ -999,18 +1015,10 @@ export const register: Register = (on, options) => {
               effort: typeof e.effort === 'string' ? e.effort : a.effort,
               status: 'running',
               endedAt: undefined,
-              contextTokens:
-                (usage.input_tokens || 0) +
-                (usage.cache_read_input_tokens || 0) +
-                (usage.cache_creation_input_tokens || 0) +
-                (usage.output_tokens || 0),
+              contextTokens: inputOf(usage) + (usage.output_tokens || 0),
               contextMax: windowOf(model),
-              tokens:
-                a.tokens +
-                (usage.input_tokens || 0) +
-                (usage.output_tokens || 0) +
-                (usage.cache_read_input_tokens || 0) +
-                (usage.cache_creation_input_tokens || 0),
+              inputTokens: (a.inputTokens || 0) + inputOf(usage),
+              outputTokens: (a.outputTokens || 0) + (usage.output_tokens || 0),
               costUsd: a.costUsd + costOf(model, usage, true),
               steps: a.steps + 1,
             },
@@ -1035,11 +1043,8 @@ export const register: Register = (on, options) => {
             ...(fallback && e.usage
               ? {
                   model: e.usage.model || a.model,
-                  tokens:
-                    e.usage.input_tokens +
-                    e.usage.output_tokens +
-                    e.usage.cache_read_input_tokens +
-                    e.usage.cache_creation_input_tokens,
+                  inputTokens: inputOf(e.usage),
+                  outputTokens: e.usage.output_tokens || 0,
                   costUsd: costOf(e.usage.model || a.model, e.usage, false),
                 }
               : {}),
@@ -1101,7 +1106,7 @@ export const register: Register = (on, options) => {
       />
     )
     const isEmpty = list.length === 0 && planned.length === 0
-    const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
+    const summary = `≈${fmtCost(t.cost)}, ${fmtInOut(t)}, ${fmtTime(t.time)}`
 
     if (e.surface === 'desktop' && 'Svg' in ui) {
       const { Svg } = ui
@@ -1207,7 +1212,7 @@ export const register: Register = (on, options) => {
           {toggleCompact}
         </Box>
         <Text dimColor>
-          ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
+          ≈{fmtCost(t.cost)} · {fmtInOut(t)} · {fmtTime(t.time)}
         </Text>
         {p.isCompact ? (
           <Text wrap="truncate-end">

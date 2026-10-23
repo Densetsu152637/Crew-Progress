@@ -63,6 +63,7 @@ crew-progress uses its own names throughout (`/crew`, the `crew-agents` pane, `m
 | --- | --- |
 | Model and effort | The main loop's latest model request (`turn.step`); `—` until the first one after the mod loads. |
 | Context | The engine's own measure of the live window after each main turn (`session.measure`, `SessionContextUsage`), and the request's input side between measures. |
+| Input and output tokens | Each request's prompt side (uncached input plus cache reads and writes) and its output, summed separately; the panel totals show them as two figures. |
 | Estimated cost | Each main-loop request's token counts priced with the same table as the subagents (`PRICES` in `hooks/register.tsx`). |
 | Time | Since the session began (`$.session.usage().startedAt`). |
 

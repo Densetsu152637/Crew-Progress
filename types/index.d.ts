@@ -36,7 +36,9 @@ export type AgentRun = {
   endedAt?: number
   contextTokens: number
   contextMax: number
-  tokens: number
+  /** Prompt-side tokens summed over requests, cache reads and writes included. */
+  inputTokens: number
+  outputTokens: number
   costUsd: number
   steps: number
   round: number

@@ -64,6 +64,14 @@ test('root: model, effort, context, estimated cost and time of the main loop', a
   expect(await ui.find({ type: 'Text', text: /ctx 20% · 200k ≈\$0\.18 1:05/ })).toBeDefined()
 })
 
+test('root: the totals keep input and output tokens apart', async ($, on) => {
+  await session($, on)
+  await mainTurn($)
+  const ui = await terminal($)
+  // Input is the prompt side with cache reads (10K + 190K); output is the 5K written.
+  expect(await ui.find({ type: 'Text', text: /≈\$0\.18 · 200k in · 5k out · 1:05/ })).toBeDefined()
+})
+
 test("root: the engine's measure replaces the window figures", async ($, on) => {
   await session($, on)
   await mainTurn($)
