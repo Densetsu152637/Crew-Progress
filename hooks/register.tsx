@@ -1112,8 +1112,8 @@ export const register: Register = (on, options) => {
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
     )
-    // A subagent's row opens its transcript in the main view, as the tasks list
-    // does; the row already in view takes the person back to the main one.
+    // On the desktop, a subagent's row opens its transcript in the main view, as
+    // the tasks list does; the row already in view takes the person back to the main one.
     const viewed = e.props.view?.agentId
     const viewButton = (a: AgentRun) => {
       const id = a.agentId
@@ -1230,7 +1230,6 @@ export const register: Register = (on, options) => {
               {steps}{s.ctx} {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
             </Text>
           </Text>
-          {viewButton(a)}
         </Box>
       )
     }

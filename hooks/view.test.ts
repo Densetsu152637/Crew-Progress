@@ -34,27 +34,31 @@ const session = async ($: Engine, on: On, views: unknown[], deny?: string) => {
 const mount = ($: Engine, surface: 'terminal' | 'desktop', view: { agentId?: string } = {}) =>
   $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: 'crew-agents', props: pane(view) })
 
-for (const surface of ['terminal', 'desktop'] as const) {
-  test(`view (${surface}): a subagent's row opens its task in the main view`, async ($, on) => {
-    const views: unknown[] = []
-    await session($, on, views)
-    const ui = await mount($, surface)
-    const open = await ui.find({ type: 'Button', key: 'view-a1' })
-    expect(open?.props.label).toBe('Open task ›')
-    await ui.press({ key: 'view-a1' })
-    expect(views).toEqual([{ agentId: 'a1' }])
-  })
+test("view: a subagent's row opens its task in the main view", async ($, on) => {
+  const views: unknown[] = []
+  await session($, on, views)
+  const ui = await mount($, 'desktop')
+  const open = await ui.find({ type: 'Button', key: 'view-a1' })
+  expect(open?.props.label).toBe('Open task ›')
+  await ui.press({ key: 'view-a1' })
+  expect(views).toEqual([{ agentId: 'a1' }])
+})
 
-  test(`view (${surface}): the row in view goes back to the main conversation`, async ($, on) => {
-    const views: unknown[] = []
-    await session($, on, views)
-    const ui = await mount($, surface, { agentId: 'a1' })
-    const back = await ui.find({ type: 'Button', key: 'view-a1' })
-    expect(back?.props.label).toBe('‹ Back to main')
-    await ui.press({ key: 'view-a1' })
-    expect(views).toEqual([{}])
-  })
-}
+test('view: the row in view goes back to the main conversation', async ($, on) => {
+  const views: unknown[] = []
+  await session($, on, views)
+  const ui = await mount($, 'desktop', { agentId: 'a1' })
+  const back = await ui.find({ type: 'Button', key: 'view-a1' })
+  expect(back?.props.label).toBe('‹ Back to main')
+  await ui.press({ key: 'view-a1' })
+  expect(views).toEqual([{}])
+})
+
+test('view: the terminal panel draws no open button', async ($, on) => {
+  await session($, on, [])
+  const ui = await mount($, 'terminal')
+  expect(await ui.findAll({ type: 'Button', key: 'view-a1' })).toHaveLength(0)
+})
 
 test('view: a refused view is said in a toast', async ($, on) => {
   const views: unknown[] = []
