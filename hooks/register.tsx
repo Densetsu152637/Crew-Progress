@@ -101,6 +101,8 @@ const STRINGS = {
     ctx: 'ctx',
     main: 'Main session',
     isIdle: 'idle',
+    openTask: 'Open task',
+    backToMain: 'Back to main',
     tier: {
       light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
@@ -142,6 +144,8 @@ const STRINGS = {
     ctx: 'ctx',
     main: 'Основная сессия',
     isIdle: 'ожидает',
+    openTask: 'Открыть задачу',
+    backToMain: 'К основной сессии',
     tier: {
       light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
       root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
@@ -183,6 +187,8 @@ const STRINGS = {
     ctx: 'הקשר',
     main: 'השיחה הראשית',
     isIdle: 'ממתין',
+    openTask: 'פתיחת המשימה',
+    backToMain: 'חזרה לשיחה הראשית',
     tier: {
       light: 'קל', medium: 'בינוני', careful: 'זהיר', heavy: 'כבד', fable: 'פייבל', other: 'אחר',
       root: 'ראשי', manager: 'מנהל', explorer: 'חוקר', implementer: 'מיישם', validator: 'מאמת',
@@ -1106,6 +1112,26 @@ export const register: Register = (on, options) => {
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
     )
+    // A subagent's row opens its transcript in the main view, as the tasks list
+    // does; the row already in view takes the person back to the main one.
+    const viewed = e.props.view?.agentId
+    const viewButton = (a: AgentRun) => {
+      const id = a.agentId
+      if (!id) return null
+      const isViewed = id === viewed
+      return (
+        <Button
+          key={`view-${a.id}`}
+          label={isViewed ? `${isRtl() ? '›' : '‹'} ${s.backToMain}` : `${s.openTask} ${isRtl() ? '‹' : '›'}`}
+          plain
+          dimColor
+          onPress={async () => {
+            const shown = await $.ui.view(isViewed ? {} : { agentId: id })
+            if (shown.deny) await $.ui.toast(shown.deny)
+          }}
+        />
+      )
+    }
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtInOut(t)}, ${fmtTime(t.time)}`
 
@@ -1131,7 +1157,8 @@ export const register: Register = (on, options) => {
       }
       const shownDone = p.isDoneCollapsed ? 0 : finished.length
       const lines = 1 + (isEmpty ? 1 : 0) + (running.length > 0 ? 1 : 0) + (finished.length > 0 ? 1 : 0) + (planned.length > 0 ? 1 : 0)
-      const gridH = headerHeight(title) + lines * LINE_H + ((main ? 1 : 0) + running.length + shownDone) * 66 + planned.length * 46
+      const viewable = [...running, ...(p.isDoneCollapsed ? [] : finished)].filter(a => a.agentId).length
+      const gridH = headerHeight(title) + (lines + viewable) * LINE_H + ((main ? 1 : 0) + running.length + shownDone) * 66 + planned.length * 46
       return (
         <Box flexDirection="column">
           {/* The grid sizes the pane; the content is placed over it, as an
@@ -1153,14 +1180,16 @@ export const register: Register = (on, options) => {
             )}
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
-            {running.map(a => (
-              <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isRunning}`} width={W} height={66} />
-            ))}
+            {running.flatMap(a => [
+              <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isRunning}`} width={W} height={66} />,
+              viewButton(a),
+            ])}
             {finished.length > 0 && toggleDone}
             {!p.isDoneCollapsed &&
-              finished.map(a => (
-                <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />
-              ))}
+              finished.flatMap(a => [
+                <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />,
+                viewButton(a),
+              ])}
             {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
             {planned.map(pl => (
               <Svg key={`plan-${pl.n}`} source={plannedSvg(W, pl)} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
@@ -1201,6 +1230,7 @@ export const register: Register = (on, options) => {
               {steps}{s.ctx} {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
             </Text>
           </Text>
+          {viewButton(a)}
         </Box>
       )
     }
