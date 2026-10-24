@@ -555,6 +555,39 @@ const reactivated = (a: AgentRun, at: number): AgentRun =>
     ? a
     : { ...a, status: 'running', endedAt: undefined, idleMs: (a.idleMs ?? 0) + (a.endedAt === undefined ? 0 : Math.max(0, at - a.endedAt)) }
 
+// What a reused agent is handed: SendMessage's `summary` and its message, or the
+// message alone a resume or a waking turn carries.
+type Task = { summary?: string; prompt?: string }
+
+// A task's title: its summary, else its message's first line.
+const taskTitle = (t: Task): string =>
+  clip((t.summary?.trim() || (t.prompt ?? '').split('\n').find(l => l.trim()) || '').trim().replace(/\s+/g, ' '), 80)
+
+// A finished row given a new task is running again under the task's title: its role
+// follows a new brief's `Profile:` tag and its reported steps start over. A running
+// row is left as it is: a message to a busy agent waits behind its task.
+const reused = (a: AgentRun, at: number, task: Task = {}): AgentRun => {
+  if (a.status === 'running') return a
+  const title = taskTitle(task)
+  if (!title) return reactivated(a, at)
+  const tag = PROFILE_TAG.exec(task.prompt ?? '')?.[1]?.toLowerCase() ?? ''
+  return {
+    ...reactivated(a, at),
+    description: title,
+    role: PROFILES.includes(tag) ? roleOfSpawn(a.type, task.prompt ?? '') : a.role,
+    stepDone: undefined,
+    stepTotal: undefined,
+    stepNote: undefined,
+  }
+}
+
+// The list with one agent's row renewed and moved last, the newest under Running.
+const renew = (list: AgentRun[], agentId: string, at: number, task?: Task): AgentRun[] => {
+  const row = list.find(a => a.agentId === agentId)
+  if (!row || row.status === 'running') return list
+  return [...list.filter(a => a !== row), reused(row, at, task)]
+}
+
 type Planned = PlannedTask & { n: number }
 
 const plannedOf = (f: Flow | null, list: AgentRun[]): Planned[] => {
@@ -899,12 +932,24 @@ export const register: Register = (on, options) => {
     })
 
     // Ticks the running clocks (agents', and the main session's mid-turn); quiet when nothing runs.
+    // A finished row whose agent the engine lists as at work again was reused by a way no
+    // hook here heard (the engine keeps an agent's turns from the hooks its spawn ran in).
     $.clock.every(1000, () => {
       void (async () => {
+        const at = await $.clock.now()
+        if ((await read($, agents)).some(a => a.agentId && a.status !== 'running')) {
+          let live: Awaited<ReturnType<typeof $.agent.list>> = []
+          try {
+            live = await $.agent.list()
+          } catch {
+            // No agent list from this host: a reuse shows once its own events say so.
+          }
+          const woken = live.filter(l => l.status === 'pending' || l.status === 'running' || l.status === 'waiting').map(l => l.id)
+          await update($, agents, list => woken.reduce((rows, id) => renew(rows, id, at), list))
+        }
         const list = await read($, agents)
         const main = await read($, root)
         if (!list.some(a => a.status === 'running') && main?.status !== 'running') return
-        const at = await $.clock.now()
         await update($, now, () => at)
       })()
     })
@@ -974,18 +1019,51 @@ export const register: Register = (on, options) => {
     }
   })
 
+  // A message to a finished subagent resumes it with a new task: its row is renewed
+  // before the send, as a resumed run may end before the call answers.
+  on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {
+    const input = e as unknown as { to?: unknown; summary?: string; message?: string }
+    const to = typeof input.to === 'string' ? input.to.replace(/\s*\[[^\]]*\]$/, '').trim() : ''
+    const list = await read($, agents)
+    if (!to || !list.some(a => a.agentId && a.status !== 'running')) return next(e)
+    let id = list.some(a => a.agentId === to) ? to : undefined
+    if (!id) {
+      try {
+        id = (await $.agent.list()).find(l => l.id === to || l.name === to)?.id
+      } catch {
+        // No agent list from this host: the resume's own spawn renews the row.
+      }
+    }
+    const row = id ? list.find(a => a.agentId === id) : undefined
+    if (!row || row.status === 'running') return next(e)
+    const at = await $.clock.now()
+    await update($, agents, rows => renew(rows, row.agentId as string, at, { summary: input.summary, prompt: input.message }))
+    await update($, now, () => at)
+    const sent = await next(e)
+    // Refused, nothing resumed: the row is as it was.
+    if (sent.deny !== undefined) await update($, agents, rows => rows.map(a => (a.id === row.id && a.status === 'running' ? row : a)))
+    return sent
+  })
+
   on('agent.spawn', async ($, e, next) => {
+    // A resume renews its row before the run starts, as the run may end before the
+    // spawn answers; a refused resume leaves it as it was.
+    const resumed = e.resume?.agentId
+    const before = resumed ? (await read($, agents)).find(a => a.agentId === resumed) : undefined
+    if (resumed && before) {
+      const at = await $.clock.now()
+      await update($, agents, list => renew(list, resumed, at, { prompt: e.prompt }))
+      await update($, now, () => at)
+      const started = await next(e)
+      if (started.deny !== undefined) await update($, agents, list => list.map(a => (a.id === before.id && a.status === 'running' && before.status !== 'running' ? before : a)))
+      return started
+    }
+
     const isUnbriefed = e.subagentType.startsWith('savvy-') && !e.prompt.includes(STEP_TOOL)
     const started = await next(isUnbriefed ? { ...e, prompt: e.prompt + STEP_BRIEF } : e)
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
-    const resumed = e.resume?.agentId
-    if (resumed && (await read($, agents)).some(a => a.agentId === resumed)) {
-      await update($, agents, list => list.map(a => (a.agentId === resumed ? reactivated(a, at) : a)))
-      await update($, now, () => at)
-      return started
-    }
     await update($, agents, list => {
       const round = 1 + list.filter(a => norm(a.description) === norm(e.description) && e.description).length
       const run: AgentRun = {
@@ -1027,7 +1105,7 @@ export const register: Register = (on, options) => {
       await update($, root, (prev): AgentRun => ({ ...(prev ?? newRoot(at)), status: 'running' }))
       await update($, now, () => at)
     } else if ((await read($, agents)).some(a => a.agentId === agentId && a.status !== 'running')) {
-      await update($, agents, list => list.map(a => (a.agentId === agentId ? reactivated(a, at) : a)))
+      await update($, agents, list => renew(list, agentId, at, { prompt: e.text }))
       await update($, now, () => at)
     }
     return started
@@ -1091,7 +1169,8 @@ export const register: Register = (on, options) => {
       await update($, agents, list =>
         list.map((a): AgentRun => {
           if (a.agentId !== agentId) return a
-          // A run whose steps went unseen still gets the turn's own sum.
+          // A run whose steps went unseen still gets the turn's own sum, added to the
+          // turns before it when the agent was reused.
           const fallback = a.steps === 0 && e.usage
           return {
             ...a,
@@ -1100,9 +1179,9 @@ export const register: Register = (on, options) => {
             ...(fallback && e.usage
               ? {
                   model: e.usage.model || a.model,
-                  inputTokens: inputOf(e.usage),
-                  outputTokens: e.usage.output_tokens || 0,
-                  costUsd: costOf(e.usage.model || a.model, e.usage, false),
+                  inputTokens: (a.inputTokens || 0) + inputOf(e.usage),
+                  outputTokens: (a.outputTokens || 0) + (e.usage.output_tokens || 0),
+                  costUsd: a.costUsd + costOf(e.usage.model || a.model, e.usage, false),
                 }
               : {}),
           }
