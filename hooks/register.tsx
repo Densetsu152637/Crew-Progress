@@ -19,6 +19,8 @@ const panel = atom({ plugin: 'crew-progress', key: 'panel' } as const, {
 const now = atom({ plugin: 'crew-progress', key: 'now' } as const, 0)
 // The main session's own usage, drawn as the panel's pinned first row.
 const root = atom({ plugin: 'crew-progress', key: 'root' } as const, null)
+// Counts the rows the viewed subagent's conversation has kept: the open thread reads it, so a new row redraws the pane.
+const threadRows = atom({ plugin: 'crew-progress', key: 'threadRows' } as const, 0)
 
 const TOOL = 'mcp__crew-progress__progress'
 const STEP_TOOL = 'mcp__crew-progress__step'
@@ -1192,7 +1194,6 @@ export const register: Register = (on, options) => {
       await update($, now, () => at)
       await syncTicker($)
     } else if ((await read($, agents)).some(a => a.agentId === agentId && a.status !== 'running')) {
-      touchThread(agentId)
       await update($, agents, list => renew(list, agentId, at, { prompt: e.text }))
       await update($, now, () => at)
       await syncTicker($)
@@ -1229,7 +1230,6 @@ export const register: Register = (on, options) => {
     }
 
     const model = usage.model || e.model
-    touchThread(agentId)
     await update($, agents, list =>
       list.map((a): AgentRun =>
         a.agentId !== agentId
@@ -1251,6 +1251,19 @@ export const register: Register = (on, options) => {
     )
     await syncTicker($)
     return result
+  })
+
+  // Each row a subagent's conversation keeps (its reply, a tool call's result, a message sent to it):
+  // `next` answers once the row is stored, so the refetch then sees it. Only the thread being
+  // viewed redraws; any other agent's rows cost nothing.
+  on('session.append', async ($, e, next) => {
+    const stored = await next(e)
+    const agentId = e.agentId
+    if (!agentId || stored.deny !== undefined) return stored
+    touchThread(agentId)
+    const viewing = (await read($, panel)).viewing
+    if (viewing && (await read($, agents)).some(a => a.id === viewing && a.agentId === agentId)) await update($, threadRows, n => n + 1)
+    return stored
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -1404,6 +1417,7 @@ export const register: Register = (on, options) => {
           />
         )
         // The thread is fetched again when an event of this agent changed it, not on the clock.
+        await read($, threadRows)
         const version = threadVersion.get(viewing.agentId) ?? 0
         let cached = threads.get(viewing.agentId)
         if (!cached || cached.version !== version) {

@@ -67,6 +67,7 @@ declare module 'claude-code' {
       root: AgentRun | null
       panel: Panel
       now: number
+      threadRows: number
     }
   }
 }

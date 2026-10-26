@@ -19,26 +19,32 @@ const SPAWN = {
   fork: false,
 }
 const THREAD = [{ role: 'assistant', text: 'Looking.', toolUses: [] }]
+// What each agent's conversation holds now; a test pushes a row here, then raises the event that stored it.
+const rows: Record<string, unknown[]> = {}
+let current: ReturnType<typeof mock.clock> | undefined
 
 // The engine beneath the plugin; `calls` counts what the tests watch. No agent is spawned yet.
 const session = async ($: Engine, on: On) => {
   const calls = { messages: 0 }
+  rows.a1 = [...THREAD]
+  rows.a2 = [...THREAD]
   const clock = mock.clock(on, { now: NOW })
+  current = clock
   mock.env(on, { LANG: 'en_US.UTF-8' })
   on('settings.read', async () => ({ value: {} }) as never)
   on('tool.register', (_$, e) => ({ value: { tool: `mcp__crew-progress__${e.name}` } }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', async () => ({ cwd: '/repo' }) as never)
-  on('agent.spawn', () => ({ model: 'claude-haiku-4-5', agentId: 'a1' }))
+  on('agent.spawn', (_$, e) => ({ model: 'claude-haiku-4-5', agentId: e.tool_use_id === 't2' ? 'a2' : 'a1' }))
   on('turn.start', (_$, e) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }) as never)
   on('turn.step', async function* (_$, e) {
     return { turnId: e.turnId, index: 0, answer: '', toolUses: [], stopReason: 'end_turn', usage: USAGE } as never
   })
-  on('session.messages', () => {
+  on('session.messages', (_$, e) => {
     calls.messages++
-    return { value: THREAD as never }
+    return { value: [...(rows[e.agentId ?? ''] ?? [])] as never }
   })
   await $.session.start({ source: 'startup', cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
   return { clock, calls }
@@ -143,17 +149,74 @@ test("perf: a finished row's drawing is reused while the clock ticks", async ($,
   await ui.unmount()
 })
 
-test('perf: a thread is fetched once, not on every clock tick, and again after its agent steps', async ($, on) => {
-  const { clock, calls } = await session($, on)
-  await spawn($)
+// A row stored in an agent's conversation; the redraw it asks for settles on the mocked clock.
+const note = async ($: Engine, agentId: string, text: string) => {
+  await $.session.append({ message: { type: 'user', content: [{ type: 'text', text }] }, agentId } as never)
+  await current?.settle()
+}
+
+const thread = async ($: Engine) => {
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
   await ui.press({ key: 'view-a1' })
+  return ui
+}
+const texts = async (ui: Awaited<ReturnType<typeof thread>>) => (await ui.findAll({ type: 'Markdown' })).map(el => String(el.props.text))
+
+test('perf: a thread is fetched once, not on every clock tick', async ($, on) => {
+  const { clock, calls } = await session($, on)
+  await spawn($)
+  const ui = await thread($)
   expect(calls.messages).toBe(1)
   await clock.advance(5000)
   expect(calls.messages).toBe(1)
+  await ui.unmount()
+})
+
+test('thread: a row stored for the viewed agent is fetched once and shown', async ($, on) => {
+  const { calls } = await session($, on)
+  await spawn($)
+  const ui = await thread($)
+  expect(await texts(ui)).toEqual(['Looking.'])
+  rows.a1?.push({ role: 'assistant', text: 'Found it.', toolUses: [] })
+  await note($, 'a1', 'Found it.')
+  expect(calls.messages).toBe(2)
+  expect(await texts(ui)).toEqual(['Looking.', 'Found it.'])
+  await ui.unmount()
+})
+
+test("thread: another agent's rows fetch nothing", async ($, on) => {
+  const { calls } = await session($, on)
+  await spawn($)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 't2', description: 'Other work' } as never)
+  const ui = await thread($)
+  await note($, 'a2', 'Elsewhere.')
+  expect(calls.messages).toBe(1)
+  await ui.unmount()
+})
+
+test('thread: a step whose row is stored later still shows once it is stored', async ($, on) => {
+  const { calls } = await session($, on)
+  await spawn($)
+  const ui = await thread($)
   const stepped = $.turn.step as (e: unknown) => AsyncIterable<unknown>
   for await (const _ of stepped({ index: 0, messageCount: 1, turnId: 's1', model: 'claude-haiku-4-5', agentId: 'a1' })) void _
-  await clock.settle()
-  expect(calls.messages).toBe(2)
+  // The step's reply is not stored yet: the thread is as it was.
+  expect(await texts(ui)).toEqual(['Looking.'])
+  rows.a1?.push({ role: 'assistant', text: 'Late reply.', toolUses: [] })
+  await note($, 'a1', 'Late reply.')
+  expect(await texts(ui)).toEqual(['Looking.', 'Late reply.'])
+  expect(calls.messages).toBeLessThanOrEqual(3)
+  await ui.unmount()
+})
+
+test('thread: closing the thread stops the fetches', async ($, on) => {
+  const { calls } = await session($, on)
+  await spawn($)
+  const ui = await thread($)
+  await ui.press({ key: 'back' })
+  const before = calls.messages
+  await note($, 'a1', 'After close.')
+  await finish($)
+  expect(calls.messages).toBe(before)
   await ui.unmount()
 })
