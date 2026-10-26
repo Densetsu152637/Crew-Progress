@@ -1390,7 +1390,7 @@ export const register: Register = (on, options) => {
       // The crab and status mark of a row, laid over its text: they are their own image, so the
       // text changing each second does not load them again and restart their animation.
       const motion = (a: AgentRun) => (
-        <Box position="absolute" top={0} left={0}>
+        <Box position="absolute" top={0} left={0} right={0} bottom={0}>
           <Svg source={motionDrawing(W, a)} alt="" width={W} height={66} />
         </Box>
       )
