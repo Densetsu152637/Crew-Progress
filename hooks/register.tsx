@@ -544,6 +544,62 @@ const statusMark = (x: number, y: number, status: string, color: string): string
 const startText = (x: number, y: number): string => `x="${x}" y="${y}"`
 const endText = (x: number, y: number): string => `x="${x}" y="${y}" text-anchor="end"`
 
+// A running time that counts by itself. The desktop loads a drawing anew whenever its markup changes, and
+// a time written as text changed it every second: a new image a second per running row, which the app
+// kept. Each place of the time is instead a strip of glyphs moved by a stepped CSS animation whose delay is
+// set from the elapsed time at drawing, so the markup holds while the run goes on and is redrawn once a
+// minute (DESKTOP_MS) to correct a strip that was loaded again. Per strip: its glyphs, and the seconds
+// each shows for.
+type Strip = { glyphs: string[]; unit: number }
+const DIGITS = [...'0123456789']
+// The minutes' tens with the hours before them, over ten hours: nothing under ten minutes, then 1–5, then 1:0 on.
+const HEAD = Array.from({ length: 60 }, (_, i) => {
+  const h = Math.floor(i / 6)
+  const t = i % 6
+  return h ? `${h}:${t}` : t ? String(t) : ''
+})
+// The head strip turns over at ten hours; a longer run is written as text.
+const CLOCK_MAX = 10 * 3600_000 - 120_000
+const SECONDS: Strip = { glyphs: DIGITS, unit: 1 }
+const TENS: Strip = { glyphs: DIGITS.slice(0, 6), unit: 10 }
+const MINUTES: Strip = { glyphs: DIGITS, unit: 60 }
+const HEADS: Strip = { glyphs: HEAD, unit: 600 }
+
+const digitW = (size: number): number => size * 0.6
+const colonW = (size: number): number => size * 0.32
+
+// The time's width as it will be by the next redraw, so it does not grow into the text before it.
+const clockWidth = (ms: number, size: number): number => {
+  const s = Math.floor((ms + 2 * DESKTOP_MS) / 1000)
+  const dw = digitW(size)
+  return 3 * dw + colonW(size) + (s >= 3600 ? 2 * dw + colonW(size) : s >= 600 ? dw : 0)
+}
+
+// The time `ms` ending at x, on the baseline y; `attrs` styles its glyphs as the text around it.
+const clock = (x: number, y: number, size: number, ms: number, attrs: string): string => {
+  const dw = digitW(size)
+  const lh = Math.ceil(size * 1.4)
+  const base = Math.ceil(size)
+  const rules: string[] = []
+  const cell = (right: number, w: number, s: Strip): string => {
+    const n = s.glyphs.length
+    const period = n * s.unit
+    rules.push(`.q${rules.length}{animation:q${n}x${lh} ${period}s steps(${n}) -${((ms / 1000) % period).toFixed(2)}s infinite}`)
+    const glyphs = s.glyphs.map((g, i) => (g ? `<text ${endText(w, base + i * lh)}${attrs}>${g}</text>` : '')).join('')
+    return `<svg x="${right - w}" y="${y - base}" width="${w}" height="${lh}" overflow="hidden"><g class="q${rules.length - 1}">${glyphs}</g></svg>`
+  }
+  const colon = x - 2 * dw - colonW(size) / 2
+  const cells = [
+    cell(x, dw, SECONDS),
+    cell(x - dw, dw, TENS),
+    `<text x="${colon}" y="${y}" text-anchor="middle"${attrs}>:</text>`,
+    cell(x - 2 * dw - colonW(size), dw, MINUTES),
+    cell(x - 3 * dw - colonW(size), 2 * dw + colonW(size), HEADS),
+  ].join('')
+  const frames = [10, 6, 60].map(n => `@keyframes q${n}x${lh}{to{transform:translateY(-${n * lh}px)}}`).join('')
+  return `<g class="clk" aria-label="${fmtTime(ms)}"><style>${rules.join('')}${frames}</style>${cells}</g>`
+}
+
 const crabWidth = (scale: number): number => Math.round(CRAB_BOX * scale * 100) / 100
 
 // A panel crab at x.
@@ -569,22 +625,28 @@ const svg = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${body.includes('class="live"') ? LIVE_CSS : ''}${body.includes(' run"') ? CRAB_CSS : ''}${body}</svg>`
 
 // The pane's own title already says "Agents": the header names the flow, if any.
-const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): string => {
+// `isTicking`: the time runs on, and counts by itself (see `clock`).
+const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>, isTicking = false): string => {
   const s = tr()
   const gap = 6
   const tw = (W - gap * 3) / 4
   // A narrow pane shrinks the figures so "≈$12.3" still fits its tile.
   const size = tw >= 80 ? 15 : 13
   const top = title ? 28 : 0
-  const tile = (i: number, k: string, v: string) =>
+  const figure = `font-family="${FONT}" font-size="${size}" font-weight="600" font-variant-numeric="tabular-nums"`
+  const figureAt = (i: number) => i * (tw + gap) + 9
+  // `drawn`: the figure's own markup, in place of `v` written as text.
+  const tile = (i: number, k: string, v: string, drawn = '') =>
     `<rect class="tile" x="${i * (tw + gap)}" y="${top}" width="${tw}" height="40" rx="8"/>
-<text class="s" ${startText(i * (tw + gap) + 9, top + 16)} font-family="${FONT}" font-size="11">${k}</text>
-<text class="t" ${startText(i * (tw + gap) + 9, top + 33)} font-family="${FONT}" font-size="${size}" font-weight="600" font-variant-numeric="tabular-nums">${v}</text>`
+<text class="s" ${startText(figureAt(i), top + 16)} font-family="${FONT}" font-size="11">${k}</text>
+${drawn || `<text class="t" ${startText(figureAt(i), top + 33)} ${figure}>${v}</text>`}`
+  const time =
+    isTicking && t.time < CLOCK_MAX ? clock(figureAt(3) + clockWidth(t.time, size), top + 33, size, t.time, ` class="t" ${figure}`) : ''
   return svg(
     W,
     headerHeight(title),
     `${title ? `<text class="t" ${startText(0, 15)} font-family="${FONT}" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>` : ''}
-${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.input, fmtTokens(t.input))}${tile(2, s.output, fmtTokens(t.output))}${tile(3, s.time, fmtTime(t.time))}`,
+${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.input, fmtTokens(t.input))}${tile(2, s.output, fmtTokens(t.output))}${tile(3, s.time, fmtTime(t.time), time)}`,
   )
 }
 
@@ -607,7 +669,7 @@ const CRAB_COL = 40
 const MARK_COL = 22
 const rowTextW = (W: number): number => W - CRAB_COL - MARK_COL
 
-const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => {
+const agentSvg = (W: number, a: AgentRun, at: number, titled = true, isTicking = false): string => {
   const TW = rowTextW(W)
   const s = tr()
   const color = colorOf(roleOf(a))
@@ -618,9 +680,18 @@ const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => 
   if (a.status === 'failed') meta.push(s.failed)
   const barW = textW
   const progress = progressOf(a)
-  const stats = `${s.ctx} ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`
+  const time = elapsed(a, at)
+  const usage = `${s.ctx} ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}`
+  const stats = `${usage}  ${fmtTime(time)}`
+  const statsFont = `font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums"`
+  // A running time counts by itself, after the usage; the two spaces before it are kept as a gap.
+  const ticks = isTicking && time < CLOCK_MAX
+  const clockW = ticks ? clockWidth(time, 11) + textWidth('  ', 11) : 0
+  const statsSvg = ticks
+    ? `<text class="s" ${endText(2 + barW - clockW, 49)} ${statsFont}>${usage}</text>${clock(2 + barW, 49, 11, time, ` class="s" ${statsFont}`)}`
+    : `<text class="s" ${endText(2 + barW, 49)} ${statsFont}>${stats}</text>`
   const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
-  const stepsW = Math.max(0, barW - textWidth(stats, 11) - 12)
+  const stepsW = Math.max(0, barW - (ticks ? textWidth(usage, 11) + clockW : textWidth(stats, 11)) - 12)
   // Without reported steps the bar falls back to the context, drawn grey.
   const fillW = Math.round(barW * (progress ?? ctx / 100))
   return svg(
@@ -629,7 +700,7 @@ const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => 
     `${titled ? `<text class="t" ${startText(2, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
 <text ${startText(2, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" ${startText(2, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
-<text class="s" ${endText(2 + barW, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
+${statsSvg}
 <rect class="k" x="2" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="2" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
 <line class="ln" x1="0" y1="65.5" x2="${TW}" y2="65.5"/>`,
   )
@@ -819,13 +890,18 @@ const touchThread = (agentId: string | undefined): void => {
 // the rows its conversation then stores (`session.append`) and by its turn, spawn and message events,
 // not by polling.
 const FAST_MS = 1000
+// The desktop's drawings count the seconds themselves (see `clock`): there the clock only redraws them once a minute.
+const DESKTOP_MS = 60_000
 let ticker: { ms: number; timer: Timer } | undefined
+// The surfaces that drew the panel this session; any but the desktop writes its times as text.
+const paneSurfaces = new Set<string>()
 
 const isBusy = async ($: EngineInterface): Promise<boolean> =>
   (await read($, agents)).some(a => a.status === 'running') || (await read($, root))?.status === 'running'
 
 async function syncTicker($: EngineInterface): Promise<void> {
-  const ms = (await isBusy($)) ? FAST_MS : 0
+  const isDesktop = paneSurfaces.size > 0 && [...paneSurfaces].every(s => s === 'desktop')
+  const ms = (await isBusy($)) ? (isDesktop ? DESKTOP_MS : FAST_MS) : 0
   if (ticker?.ms === ms) return
   ticker?.timer.cancel()
   ticker = ms ? { ms, timer: $.clock.every(ms, () => void tick($)) } : undefined
@@ -864,6 +940,7 @@ export const register: Register = (on, options) => {
     ticker = undefined
     memo.reset()
     threads.clear()
+    paneSurfaces.clear()
     band = undefined
     // What the panel's state says now: finished subagents and the open thread, for the hooks that mirror them.
     const kept = await read($, agents)
@@ -1262,13 +1339,26 @@ export const register: Register = (on, options) => {
     // The main session's row, pinned first; absent only before the session started.
     const main = rootRow(await read($, root))
     // A thread is not redrawn by the clock: it reads the time off the clock once, and not from the ticking `now`.
-    const isThread = e.surface === 'desktop' && 'Svg' in ui && Boolean(p.viewing && list.find(a => a.id === p.viewing)?.agentId)
+    const isDesktop = e.surface === 'desktop' && 'Svg' in ui
+    if (!paneSurfaces.has(e.surface)) {
+      paneSurfaces.add(e.surface)
+      await syncTicker($)
+    }
+    const isThread = isDesktop && Boolean(p.viewing && list.find(a => a.id === p.viewing)?.agentId)
     const at = Math.max(isThread ? await $.clock.now() : await read($, now), ...list.map(a => a.startedAt), main?.startedAt ?? 0, 0)
+    // While anything runs, the desktop draws each running time from the clock now, to count on by itself;
+    // such a drawing is kept for the minute, as the panel's `now` moves only once a minute there.
+    const isBusyNow = list.some(a => a.status === 'running') || main?.status === 'running'
+    const clockAt = isDesktop && isBusyNow ? Math.max(at, await $.clock.now()) : at
+    const minute = Math.floor(clockAt / DESKTOP_MS)
+    const isTicking = (a: AgentRun) => isDesktop && isBusyNow && a.endedAt === undefined
     memo.begin()
     if (!isThread) threads.clear()
     // A drawing is rebuilt only when what it shows changed: a run that ended no longer depends on the time.
-    const rowKey = (W: number, a: AgentRun, titled: boolean) => JSON.stringify([W, titled, a, a.endedAt === undefined ? at : 0])
-    const agentDrawing = (W: number, a: AgentRun, titled = true) => memo.get(`a${rowKey(W, a, titled)}`, () => agentSvg(W, a, at, titled))
+    const rowKey = (W: number, a: AgentRun, titled: boolean) =>
+      JSON.stringify([W, titled, a, isTicking(a) ? `m${minute}` : a.endedAt === undefined ? at : 0])
+    const agentDrawing = (W: number, a: AgentRun, titled = true) =>
+      memo.get(`a${rowKey(W, a, titled)}`, () => agentSvg(W, a, isTicking(a) ? clockAt : at, titled, isTicking(a)))
     const crabDrawing = (a: AgentRun) => memo.get(`c${JSON.stringify([costumeOf(a), a.status])}`, () => agentCrabSvg(a))
     const markDrawing = (a: AgentRun) => memo.get(`k${JSON.stringify([roleOf(a), a.status])}`, () => agentMarkSvg(a))
 
@@ -1302,6 +1392,10 @@ export const register: Register = (on, options) => {
     if (e.surface === 'desktop' && 'Svg' in ui) {
       const { Svg, Markdown } = ui
       const W = Math.max(240, Math.min(900, (e.props.bodyColumns || 40) * 8 - 8))
+      const tc = isBusyNow ? totals(everyone, clockAt) : t
+      const header = memo.get(`h${JSON.stringify([W, title, tc.cost, tc.input, tc.output, isBusyNow ? minute : tc.time])}`, () =>
+        headerSvg(W, title, tc, isBusyNow),
+      )
       const section = (key: string, text: string) => (
         <Text key={key} dimColor>
           {text}
@@ -1395,7 +1489,7 @@ export const register: Register = (on, options) => {
       if (p.isCompact) {
         return (
           <Box flexDirection="column">
-            <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
+            <Svg source={header} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
             {toggleCompact}
             <Svg source={compactSvg(W, everyone, planned)} alt={`${list.length} ${s.agentsCount}`} width={W} height={32} />
           </Box>
@@ -1412,7 +1506,7 @@ export const register: Register = (on, options) => {
             <Svg key={`grid-${i}`} source={memo.get(`g${W}x${tileH}`, () => gridSvg(W, tileH))} alt="dotted grid" width={W} height={tileH} />
           ))}
           <Box flexDirection="column" position="absolute" top={0} left={0} right={0}>
-            <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
+            <Svg source={header} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
             {toggleCompact}
             {main && drawn(main, `${main.description}: ${modelName(main.model)}, ${main.status === 'running' ? s.isRunning : s.isIdle}`)}
             {isEmpty && <Text dimColor>{s.empty}</Text>}

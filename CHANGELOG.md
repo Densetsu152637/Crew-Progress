@@ -9,6 +9,9 @@ Version bumps before 0.13.0 were not committed one by one, so entries before 0.1
 ### Added
 - `CONTRIBUTING.md` and agent instructions (`AGENTS.md`, loaded by `.claude/CLAUDE.md`): changes target the `experimental` branch, and a release into `main` needs the maintainer's explicit confirmation. CI also runs on pushes to `experimental`.
 
+### Fixed
+- On the desktop, a running time no longer redraws its drawing every second. The main session's row, each running subagent's row and the header's time tile wrote the time into their SVG, so the app loaded a new image per running row each second while anything ran; its renderer's handle count rose by about 300 a minute with the panel open. A running time is now drawn as digit strips moved by stepped CSS animations: the drawing counts by itself and changes only when its row does, or once a minute to correct a strip that was loaded again. On the desktop the panel's clock ticks once a minute; a panel drawn as text still ticks every second.
+
 ## [1.0.0] - 2026-10-26
 
 First stable release. The [public surface](docs/public-surface.md) now follows semantic versioning: a breaking change to it needs a new major version.

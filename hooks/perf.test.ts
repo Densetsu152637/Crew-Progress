@@ -90,7 +90,13 @@ const mainTime = async ($: Engine) => {
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
   const row = (await ui.findAll({ type: 'Svg' })).find(el => String(el.props.alt).startsWith('Main session:'))
   await ui.unmount()
-  return /\s(\d+:\d\d)<\/text>/.exec(String(row?.props.source))?.[1]
+  return timeOf(String(row?.props.source))
+}
+
+// The time a row's drawing shows: written as text, or, running on the desktop, the time its clock was drawn at.
+const timeOf = (src: string) => {
+  const m = /class="clk" aria-label="(\d+:\d\d)"|\s(\d+:\d\d)<\/text>/.exec(src)
+  return m?.[1] ?? m?.[2]
 }
 
 test('perf: the clock ticks only while the main turn runs', async ($, on) => {
@@ -128,7 +134,9 @@ test('perf: the clock stops when the last agent finishes and starts with the nex
   expect(await mainTime($)).toBe('1:05')
 })
 
-test("perf: a finished row's drawing is reused while the clock ticks", async ($, on) => {
+// The desktop loads a drawing anew whenever its markup changes, and kept every one it loaded: a running
+// time must count in the drawing, not by drawing it again each second.
+test("perf: on the desktop a running row's drawing holds for the minute while its time counts by itself", async ($, on) => {
   const { clock } = await session($, on)
   await spawn($)
   await finish($)
@@ -136,17 +144,76 @@ test("perf: a finished row's drawing is reused while the clock ticks", async ($,
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
   const source = async (title: string) =>
     String((await ui.findAll({ type: 'Svg' })).find(el => String(el.props.alt).startsWith(`${title}:`))?.props.source)
+  const header = async () => String((await ui.findAll({ type: 'Svg' })).find(el => String(el.props.alt).includes('in ·'))?.props.source)
   const done1 = await source('Side work')
   const run1 = await source('Second task')
+  const head1 = await header()
+  expect(run1).toContain('class="clk"')
+  expect(head1).toContain('class="clk"')
   await clock.advance(3000)
-  const done2 = await source('Side work')
+  expect(await source('Side work')).toBe(done1)
+  expect(await source('Second task')).toBe(run1)
+  expect(await header()).toBe(head1)
+
+  // Once a minute the clock redraws it, from the time then: the minute's tick came at 1:00.
+  await clock.advance(60_000)
   const run2 = await source('Second task')
-  // The same string, not merely an equal one, would be a hit; equality holds for the finished row alone.
-  expect(done2).toBe(done1)
-  // The running row's elapsed time moved on.
   expect(run2).not.toBe(run1)
-  expect(run2).toContain('0:03')
+  expect(timeOf(run2)).toBe('1:00')
   await ui.unmount()
+})
+
+// Per strip, the delay its animation starts at: the seconds into its cycle the time was when drawn.
+const strips = (src: string) =>
+  [...src.matchAll(/\.q\d\{animation:q(\d+)x\d+ (\d+)s steps\(\d+\) -([\d.]+)s infinite\}/g)].map(m => ({
+    glyphs: Number(m[1]),
+    period: Number(m[2]),
+    delay: Number(m[3]),
+  }))
+
+test('clock: each place starts where the elapsed time is in its cycle', async ($, on) => {
+  const { clock } = await session($, on)
+  await $.turn.start({ text: 'go', turnId: 'm1' } as never)
+  // 2:37.5 into the turn's session.
+  await clock.advance(157_500)
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
+  const row = String((await ui.findAll({ type: 'Svg' })).find(el => String(el.props.alt).startsWith('Main session:'))?.props.source)
+  await ui.unmount()
+  expect(timeOf(row)).toBe('2:38')
+  // Seconds, tens of seconds, minutes, and the minutes' tens with the hours.
+  expect(strips(row)).toEqual([
+    { glyphs: 10, period: 10, delay: 7.5 },
+    { glyphs: 6, period: 60, delay: 37.5 },
+    { glyphs: 10, period: 600, delay: 157.5 },
+    { glyphs: 60, period: 36000, delay: 157.5 },
+  ])
+  // The head strip reads nothing under ten minutes, and 1:0 for the second hour's first ten minutes.
+  expect(row).toContain('>1:0</text>')
+})
+
+test('clock: a desktop panel ticks once a minute, a text panel every second', async ($, on) => {
+  // Each tick moves the panel's `now`, and while the turn waits nothing else is stored.
+  let ticks = 0
+  on('state.set', (_$, e, next) => {
+    ticks++
+    return next(e)
+  })
+  const { clock } = await session($, on)
+  await $.turn.start({ text: 'go', turnId: 'm1' } as never)
+  const desk = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
+  await clock.advance(1000)
+  ticks = 0
+  await clock.advance(30_000)
+  expect(ticks).toBeLessThanOrEqual(1)
+  await desk.unmount()
+
+  // A panel drawn as text as well needs its times moved each second.
+  const text = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Pane', requestId: 'crew-agents', props: pane })
+  await clock.advance(1000)
+  ticks = 0
+  await clock.advance(30_000)
+  expect(ticks).toBeGreaterThanOrEqual(29)
+  await text.unmount()
 })
 
 // A row stored in an agent's conversation; the redraw it asks for settles on the mocked clock.
@@ -223,7 +290,9 @@ test('thread: closing the thread stops the fetches', async ($, on) => {
 
 // Animations run on the compositor, from the moment an image loads: a drawing whose markup changes is
 // loaded again and every animation in it starts over. So what moves must not change while it runs.
-const moving = async ($: Engine, component: 'Pane' | 'AbovePrompt') => (await sources($, component)).filter(src => src.includes('infinite'))
+// A running time's drawing is left out: its clock starts where the time is (see the clock tests).
+const moving = async ($: Engine, component: 'Pane' | 'AbovePrompt') =>
+  (await sources($, component)).filter(src => src.includes('infinite') && !src.includes('class="clk"'))
 
 test('anim: a running row and the running band keep their markup across ticks and redraws', async ($, on) => {
   const { clock } = await session($, on)
@@ -255,6 +324,7 @@ test('anim: every running drawing carries the CSS that moves it', async ($, on) 
       if (src.includes(' run"')) expect(src).toContain('.run .la{animation')
       if (src.includes('class="live"')) expect(src).toContain('.live{animation')
       if (/class="t[0-3]"/.test(src)) expect(src).toContain('@keyframes tw')
+      if (src.includes('class="clk"')) expect(src).toMatch(/@keyframes q10x\d+/)
     }
     await clock.advance(1000)
   }
