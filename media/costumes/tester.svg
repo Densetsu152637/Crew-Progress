@@ -34,7 +34,7 @@
 @keyframes click{50%{transform:translate(1px,1px)}}
 .c-inspector.run .flash{animation:blink 1s steps(1) infinite}
 .c-inspector.run .note{animation:rise 1s steps(4) infinite}
-.c-generalist.run .spark{animation:blink .5s steps(1) infinite}
+.c-generalist.run .blade{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
 .c-guide.run .flag{transform-origin:0 50%;animation:wave .5s ease-in-out infinite}
 @keyframes wave{50%{transform:scaleX(.6)}}
 .c-statusline.run .roller{animation:roll 1s ease-in-out infinite}

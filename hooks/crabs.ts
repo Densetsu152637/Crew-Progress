@@ -32,7 +32,7 @@ export const PROFILE_COLOR: Record<string, string> = {
   navigator: '#E0588F',
   inspector: '#8E2F45',
   // Claude Code's own agent types that have no workflow profile.
-  generalist: '#64748B',
+  generalist: '#F2B91F',
   guide: '#4DB6F0',
   statusline: '#B0B34A',
 }
@@ -103,7 +103,7 @@ export const CRAB_CSS = `<style>
 @keyframes click{50%{transform:translate(1px,1px)}}
 .c-inspector.run .flash{animation:blink 1s steps(1) infinite}
 .c-inspector.run .note{animation:rise 1s steps(4) infinite}
-.c-generalist.run .spark{animation:blink .5s steps(1) infinite}
+.c-generalist.run .blade{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
 .c-guide.run .flag{transform-origin:0 50%;animation:wave .5s ease-in-out infinite}
 @keyframes wave{50%{transform:scaleX(.6)}}
 .c-statusline.run .roller{animation:roll 1s ease-in-out infinite}
@@ -225,13 +225,17 @@ export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
     f(12, 15, 2, 1, '#FFF4C2', 'flash')
     stamp(f, 26, 3, ['..kk', '..k.', '..k.', 'kkk.', 'kk..'], { k: t }, 'note')
   },
-  // Generalist: a field cap with a spark badge and a backpack; the spark pulses.
+  // Generalist: a plain beanie and a Swiss army knife; the main blade flicks.
   generalist: (f, t) => {
-    crabBody(f)
-    stamp(f, 8, 5, ['..tttttttttt..', '.tttttttttttt.', 'tttttttttttttt', 'bbbbbbbbbbbbbbbb'], { t, b: '#475569' })
-    f(14, 5, 2, 1, '#FF9A3C', 'spark'); f(14, 7, 2, 1, '#FF9A3C', 'spark'); f(13, 6, 4, 1, '#FF9A3C', 'spark')
-    stamp(f, 0, 8, ['tttttt', 'tbbbbt', 'tbbbbt', 'tttttt', 'tbbbbt'], { t, b: '#94A3B8' })
-    f(6, 11, 2, 1, '#475569'); f(6, 13, 2, 1, '#475569')
+    crabBody(f, -4)
+    stamp(f, 8, 5, ['..tttttttttt..', '.tttttttttttt.', 'tttttttttttttt', 'cccccccccccccc', 'cccccccccccccc'], { t, c: '#B8881A' })
+    f(11, 6, 2, 1, '#FFFFFF')
+    const lt = '#C4C9D2', dk = '#7D838F'
+    stamp(f, 23, 0, ['ld', 'ld', 'ld', 'ld', 'ld', 'ld', 'ld'], { l: lt, d: dk }, 'blade')
+    f(23, 0, 1, 1, '#FFFFFF', 'blade')
+    stamp(f, 26, 2, ['ld', 'ld', 'ld', 'ld', 'ld'], { l: lt, d: dk })
+    stamp(f, 29, 4, ['d', 'd', 'd'], { d: dk })
+    stamp(f, 22, 7, ['rrrrrrrr', 'rwrrrrrr', 'wwwrrrrr', 'rwrrrrrr', 'dddddddd'], { r: '#D52B1E', w: '#FFFFFF', d: '#8F1A12' })
   },
   // Guide: a red info cap and a tour flag on a pole; the flag waves.
   guide: (f, t) => {

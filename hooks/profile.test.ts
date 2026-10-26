@@ -22,7 +22,7 @@ const PROP: Record<string, string> = {
   auditor: 'glint',
   navigator: 'cur',
   inspector: 'flash',
-  generalist: 'spark',
+  generalist: 'blade',
   guide: 'flag',
   statusline: 'roller',
 }
