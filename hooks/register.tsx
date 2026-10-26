@@ -220,14 +220,18 @@ const fitText = (s: string, size: number, maxW: number): string => {
   return out + '…'
 }
 
-// Pixels twinkle in four out-of-phase groups while the bar's work runs.
-const BAR_MOTION_CSS = `.t0,.t1,.t2,.t3{animation:tw 2.2s ease-in-out infinite}
-.t1{animation-duration:2.8s;animation-delay:-.7s}.t2{animation-duration:1.9s;animation-delay:-1.3s}.t3{animation-duration:3.3s;animation-delay:-.4s}
+// Pixels twinkle in four out-of-phase groups while the bar's work runs. A drawing that is loaded again
+// starts its animations over, so each group's delay is set from the clock at the time of drawing: the
+// restart then lands where the cycle would have been, and the twinkle does not jump. Per group: its
+// period and its offset, in seconds.
+const BAR_GROUPS: [period: number, offset: number][] = [[2.2, 0], [2.8, 0.7], [1.9, 1.3], [3.3, 0.4]]
+const barMotionCss = (at: number): string =>
+  `${BAR_GROUPS.map(([period, offset], i) => `.t${i}{animation:tw ${period}s ease-in-out -${(((at / 1000 + offset) % period)).toFixed(2)}s infinite}`).join('')}
 @keyframes tw{0%,100%{opacity:1}50%{opacity:.3}}
 @media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}
 `
 
-const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
+const rowSvg = (f: Flow, W: number, isWorking: boolean, at: number): string => {
   // The title takes what it needs, up to 40% of the row; the bar takes the rest.
   const title = fitText(f.title, 13, Math.max(60, W * 0.4))
   const BAR_X = Math.round(16 + textWidth(title, 13) + 12)
@@ -280,7 +284,7 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 <style>
 .t{fill:#1f1f1f}.m{fill:#8a8a8a}.k{fill:#e4e4e2}.tk{fill:#b4b4b0}
 @media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}.k{fill:#2c2c2c}.tk{fill:#5a5a5a}}
-${isMoving ? BAR_MOTION_CSS : ''}</style>
+${isMoving ? barMotionCss(at) : ''}</style>
 <defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath></defs>
 <circle cx="5" cy="${H / 2}" r="4" fill="${color}"/>
 <text class="t" ${titleAt} y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
@@ -767,7 +771,16 @@ async function scrollPane($: EngineInterface, to: 'start' | 'end'): Promise<void
 
 // A thread opens on its newest message and keeps up with the ones that follow,
 // as the pane's end does until the person scrolls away from it.
-async function openThread($: EngineInterface, id: string, refresh: () => void): Promise<void> {
+// The agent whose thread is open ('' for none), kept apart from the panel's state so a row stored for
+// any other agent is let go without a read.
+let viewingAgent = ''
+// Finished subagents (by agent id): a row stored in the conversation of one of these means it was reused.
+const finishedAgents = new Set<string>()
+// The rows that are no part of a task: the engine's notices, context blocks, attachments and compaction.
+const NOT_TASK_DOORS = new Set(['notice', 'hook-context', 'attachment', 'compaction', 'queue'])
+
+async function openThread($: EngineInterface, id: string, agentId: string, refresh: () => void): Promise<void> {
+  viewingAgent = agentId
   refresh()
   await update($, panel, prev => ({ ...prev, viewing: id }))
   await scrollPane($, 'end')
@@ -800,46 +813,46 @@ const touchThread = (agentId: string | undefined): void => {
   if (agentId) threadVersion.set(agentId, (threadVersion.get(agentId) ?? 0) + 1)
 }
 
-// The clock ticks only while something runs (1 s, for the elapsed times) or, with
-// only finished subagents on the panel, slowly (to notice a reused one). It is
-// cancelled when neither holds and started again by the event that starts work.
+// The clock ticks only while something runs, for the elapsed times. It is cancelled when nothing does
+// and started again by the event that starts work. A subagent reused after it finished is noticed by
+// the rows its conversation then stores (`session.append`) and by its turn, spawn and message events,
+// not by polling.
 const FAST_MS = 1000
-const POLL_MS = 5000
 let ticker: { ms: number; timer: Timer } | undefined
-let lastPoll = -Infinity
 
 const isBusy = async ($: EngineInterface): Promise<boolean> =>
   (await read($, agents)).some(a => a.status === 'running') || (await read($, root))?.status === 'running'
 
 async function syncTicker($: EngineInterface): Promise<void> {
-  const list = await read($, agents)
-  const ms = (await isBusy($)) ? FAST_MS : list.some(a => a.agentId && a.status !== 'running') ? POLL_MS : 0
+  const ms = (await isBusy($)) ? FAST_MS : 0
   if (ticker?.ms === ms) return
   ticker?.timer.cancel()
   ticker = ms ? { ms, timer: $.clock.every(ms, () => void tick($)) } : undefined
 }
 
 // Ticks the running clocks (agents', and the main session's mid-turn).
-// A finished row whose agent the engine lists as at work again was reused by a way no
-// hook here heard (the engine keeps an agent's turns from the hooks its spawn ran in).
 async function tick($: EngineInterface): Promise<void> {
   const at = await $.clock.now()
-  const list = await read($, agents)
-  if (list.some(a => a.agentId && a.status !== 'running') && at - lastPoll >= POLL_MS) {
-    lastPoll = at
-    let live: Awaited<ReturnType<typeof $.agent.list>> = []
-    try {
-      live = await $.agent.list()
-    } catch {
-      // No agent list from this host: a reuse shows once its own events say so.
-    }
-    const woken = live.filter(l => l.status === 'pending' || l.status === 'running' || l.status === 'waiting').map(l => l.id)
-    if (woken.some(id => list.some(a => a.agentId === id && a.status !== 'running'))) {
-      await update($, agents, rows => woken.reduce((acc, id) => renew(acc, id, at), rows))
-    }
-  }
   if (await isBusy($)) await update($, now, () => at)
   await syncTicker($)
+}
+
+// The band's drawing as last made. While its inputs stand it is the same string, so the engine does not
+// load it again; a changed input draws it anew, from the clock at that time (see `barMotionCss`).
+let band: { key: string; source: string } | undefined
+const bandDrawing = (f: Flow, width: number, isWorking: boolean, at: number): string => {
+  const key = JSON.stringify([f, width, isWorking])
+  if (band?.key !== key) band = { key, source: rowSvg(f, width, isWorking, at) }
+  return band.source
+}
+
+// The time for the band's phase; a host with no clock answers with the process's.
+const bandClock = async ($: EngineInterface): Promise<number> => {
+  try {
+    return await $.clock.now()
+  } catch {
+    return Date.now()
+  }
 }
 
 export const register: Register = (on, options) => {
@@ -850,6 +863,13 @@ export const register: Register = (on, options) => {
     ticker = undefined
     memo.reset()
     threads.clear()
+    band = undefined
+    // What the panel's state says now: finished subagents and the open thread, for the hooks that mirror them.
+    const kept = await read($, agents)
+    finishedAgents.clear()
+    for (const a of kept) if (a.agentId && a.status !== 'running') finishedAgents.add(a.agentId)
+    const open = (await read($, panel)).viewing
+    viewingAgent = kept.find(a => a.id === open)?.agentId ?? ''
     await $.tool.register({
       name: 'progress',
       description:
@@ -1007,6 +1027,7 @@ export const register: Register = (on, options) => {
     const row = id ? list.find(a => a.agentId === id) : undefined
     if (!row || row.status === 'running') return next(e)
     const at = await $.clock.now()
+    finishedAgents.delete(row.agentId as string)
     await update($, agents, rows => renew(rows, row.agentId as string, at, { summary: input.summary, prompt: input.message }))
     await update($, now, () => at)
     await syncTicker($)
@@ -1026,6 +1047,7 @@ export const register: Register = (on, options) => {
     const before = resumed ? (await read($, agents)).find(a => a.agentId === resumed) : undefined
     if (resumed && before) {
       const at = await $.clock.now()
+      finishedAgents.delete(resumed)
       await update($, agents, list => renew(list, resumed, at, { prompt: e.prompt }))
       await update($, now, () => at)
       await syncTicker($)
@@ -1085,6 +1107,7 @@ export const register: Register = (on, options) => {
       await update($, now, () => at)
       await syncTicker($)
     } else if ((await read($, agents)).some(a => a.agentId === agentId && a.status !== 'running')) {
+      finishedAgents.delete(agentId)
       await update($, agents, list => renew(list, agentId, at, { prompt: e.text }))
       await update($, now, () => at)
       await syncTicker($)
@@ -1145,15 +1168,28 @@ export const register: Register = (on, options) => {
   })
 
   // Each row a subagent's conversation keeps (its reply, a tool call's result, a message sent to it):
-  // `next` answers once the row is stored, so the refetch then sees it. Only the thread being
-  // viewed redraws; any other agent's rows cost nothing.
+  // `next` answers once the row is stored, so the refetch then sees it. A row of a finished subagent
+  // means it was reused: its row is running again. Only the thread being viewed redraws; any other
+  // agent's rows are let go without a state read.
   on('session.append', async ($, e, next) => {
     const stored = await next(e)
     const agentId = e.agentId
     if (!agentId || stored.deny !== undefined) return stored
-    touchThread(agentId)
-    const viewing = (await read($, panel)).viewing
-    if (viewing && (await read($, agents)).some(a => a.id === viewing && a.agentId === agentId)) await update($, threadRows, n => n + 1)
+    if (finishedAgents.has(agentId) && !NOT_TASK_DOORS.has(e.door)) {
+      finishedAgents.delete(agentId)
+      const at = await $.clock.now()
+      // A row that carries a message is the new task's brief.
+      const content = e.message.content as unknown
+      const text = Array.isArray(content) ? content.map(b => (b as { text?: unknown }).text).find(t => typeof t === 'string') : content
+      const prompt = e.door === 'prompt' || e.door === 'delivery' ? (typeof text === 'string' ? text : undefined) : undefined
+      await update($, agents, list => renew(list, agentId, at, { prompt }))
+      await update($, now, () => at)
+      await syncTicker($)
+    }
+    if (agentId === viewingAgent) {
+      touchThread(agentId)
+      await update($, threadRows, n => n + 1)
+    }
     return stored
   })
 
@@ -1162,6 +1198,7 @@ export const register: Register = (on, options) => {
     if (agentId) {
       const at = await $.clock.now()
       touchThread(agentId)
+      finishedAgents.add(agentId)
       await update($, agents, list =>
         list.map((a): AgentRun => {
           if (a.agentId !== agentId) return a
@@ -1284,7 +1321,7 @@ export const register: Register = (on, options) => {
                 key={`view-${a.id}`}
                 label={fitText(a.description || a.type, 13, W - 42 - 22)}
                 plain
-                onPress={() => openThread($, a.id, () => touchThread(a.agentId))}
+                onPress={() => openThread($, a.id, a.agentId ?? '', () => touchThread(a.agentId))}
               />
             </Box>
           )}
@@ -1309,6 +1346,7 @@ export const register: Register = (on, options) => {
             label={`‹ ${s.backToAgents}`}
             plain
             onPress={async () => {
+              viewingAgent = ''
               await update($, panel, prev => ({ ...prev, viewing: '' }))
               await scrollPane($, 'start')
             }}
@@ -1516,7 +1554,7 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" alignItems="center" gap={1}>
-            <Svg source={rowSvg(f, width, isWorking)} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
+            <Svg source={bandDrawing(f, width, isWorking, await bandClock($))} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
             {crewButton}
             {dismiss}
           </Box>

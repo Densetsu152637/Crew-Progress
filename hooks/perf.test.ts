@@ -285,3 +285,54 @@ test('rows: every image is in flow and has an alt', async ($, on) => {
   expect(found.filter(f => f.absolute > 1)).toHaveLength(0)
   expect(found.filter(f => !f.alt)).toHaveLength(0)
 })
+
+test('reuse: no timer is left once the agents finish, and the engine list is never polled', async ($, on) => {
+  let listed = 0
+  on('agent.list', () => {
+    listed++
+    return { value: [] } as never
+  })
+  const { clock } = await session($, on)
+  await spawn($)
+  await finish($)
+  await clock.advance(600_000)
+  expect(listed).toBe(0)
+  expect(await mainTime($)).toBe('0:00')
+})
+
+// The band's twinkle delays are set from the clock when it is drawn: a restart lands in phase.
+const delays = (src: string): number[] => [...src.matchAll(/\.t\d\{animation:tw [\d.]+s ease-in-out -([\d.]+)s infinite\}/g)].map(m => Number(m[1]))
+
+test('band: the twinkle restarts in phase when its progress changes, and stays still when nothing runs', async ($, on) => {
+  const { clock } = await session($, on)
+  await $.tool.call({ tool: PROGRESS, title: 'Ship it', phase: 'delegate', total: 4 } as never)
+  await spawn($)
+  const first = (await sources($, 'AbovePrompt'))[0] ?? ''
+  const periods = [2.2, 2.8, 1.9, 3.3]
+  const offsets = [0, 0.7, 1.3, 0.4]
+  const expected = (ms: number) => periods.map((p, i) => Number((((ms / 1000 + (offsets[i] ?? 0)) % p)).toFixed(2)))
+  expect(delays(first)).toEqual(expected(NOW))
+  await clock.advance(1234)
+  // Nothing about the bar changed: the same drawing, not loaded again.
+  expect((await sources($, 'AbovePrompt'))[0]).toBe(first)
+  await clock.advance(4321)
+  await $.tool.call({ tool: PROGRESS, done: 1 } as never)
+  const later = (await sources($, 'AbovePrompt'))[0] ?? ''
+  expect(later).not.toBe(first)
+  expect(delays(later)).toEqual(expected(NOW + 1234 + 4321))
+  await finish($)
+  expect((await sources($, 'AbovePrompt')).join('')).not.toContain('infinite')
+})
+
+test("session.append: a row of an agent whose thread is not open reads no state", async ($, on) => {
+  let reads = 0
+  on('state.get', (_$, e, next) => {
+    reads++
+    return next(e)
+  })
+  await session($, on)
+  await spawn($)
+  reads = 0
+  await note($, 'a1', 'Elsewhere.')
+  expect(reads).toBe(0)
+})

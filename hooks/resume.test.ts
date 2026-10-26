@@ -105,14 +105,18 @@ test('resume: a refused SendMessage leaves the row finished', async ($, on) => {
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, finished')
 })
 
-test('resume: a finished row the engine lists as running again moves under Running', async ($, on) => {
-  let status = 'completed'
-  on('agent.list', () => ({ value: [{ id: 'a1', description: 'Side work', type: 'general-purpose', status }] }) as never)
+test("resume: a row stored in a finished subagent's conversation puts it back to running, with no polling", async ($, on) => {
+  let listed = 0
+  on('agent.list', () => {
+    listed++
+    return { value: [] } as never
+  })
+  mock.session(on)
   const clock = await finished($, on)
-  // With only finished rows the panel polls the engine's list slowly, every five seconds.
-  await clock.advance(5000)
+  await clock.advance(60_000)
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, finished')
-  status = 'running'
-  await clock.advance(5000)
+  // A task handed to it is a row of its own conversation.
+  await $.session.append({ message: { type: 'user', content: [{ type: 'text', text: 'One more thing.' }] }, agentId: 'a1' } as never)
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, running')
+  expect(listed).toBe(0)
 })
