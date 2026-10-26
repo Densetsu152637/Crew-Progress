@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-const PLUGIN = 'crew-progress'
-const PROGRESS = 'mcp__crew-progress__progress'
+const PLUGIN = 'the-crew'
+const PROGRESS = 'mcp__the-crew__progress'
 
 const band = { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 100, scroll: { offset: 0, bodyRows: 4 }, view: {} }
 const pane = { title: '', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } as const

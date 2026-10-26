@@ -2,8 +2,8 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-const PLUGIN = 'crew-progress'
-const PROGRESS = 'mcp__crew-progress__progress'
+const PLUGIN = 'the-crew'
+const PROGRESS = 'mcp__the-crew__progress'
 const NOW = Date.parse('2026-10-25T12:00:00Z')
 const pane = { title: '', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } as const
 const band = { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 100, scroll: { offset: 0, bodyRows: 4 }, view: {} }
@@ -32,7 +32,7 @@ const session = async ($: Engine, on: On) => {
   current = clock
   mock.env(on, { LANG: 'en_US.UTF-8' })
   on('settings.read', async () => ({ value: {} }) as never)
-  on('tool.register', (_$, e) => ({ value: { tool: `mcp__crew-progress__${e.name}` } }))
+  on('tool.register', (_$, e) => ({ value: { tool: `mcp__the-crew__${e.name}` } }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', async () => ({ cwd: '/repo' }) as never)

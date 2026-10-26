@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-const PLUGIN = 'crew-progress'
+const PLUGIN = 'the-crew'
 const pane = { title: '', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } as const
 
 // Each costume's own prop group: present only when that costume drew.
@@ -165,5 +165,5 @@ test('savvy workers still get the step line; a tagged brief is left as written',
   await spawn($, 'Tagged', 'general-purpose', 'Role: leaf; Profile: implementer')
   await spawn($, 'Savvy', 'savvy-light', 'Go.')
   expect(prompts[0]).toBe('Role: leaf; Profile: implementer')
-  expect(prompts[1]).toContain('mcp__crew-progress__step')
+  expect(prompts[1]).toContain('mcp__the-crew__step')
 })

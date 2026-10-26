@@ -1,4 +1,4 @@
-# crew-progress
+# the-crew
 
 A Claude Code mod: a live panel of your crew (the main session plus every subagent) and a progress bar above the prompt. It is a fork of [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) by [johnnyvizz](https://github.com/johnnyvizz), MIT licensed, with three additions:
 
@@ -41,18 +41,18 @@ The built-in subagent types wear a costume too: those that overlap a workflow pr
 At the prompt of a terminal session:
 
 ```
-/plugin install crew-progress --marketplace Densetsu152637/Crew-Progress
+/plugin install the-crew --marketplace Densetsu152637/The-Crew
 ```
 
 From a shell:
 
 ```
-claude plugin install crew-progress --marketplace Densetsu152637/Crew-Progress
+claude plugin install the-crew --marketplace Densetsu152637/The-Crew
 ```
 
-In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `Densetsu152637/Crew-Progress`, then Add plugin.
+In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `Densetsu152637/The-Crew`, then Add plugin.
 
-crew-progress uses its own names throughout (`/crew`, the `crew-agents` pane, `mcp__crew-progress__*` tools), so it can be installed beside savvy-progress; you will usually want only one of them enabled, since both draw a panel.
+the-crew uses its own names throughout (`/crew`, the `crew-agents` pane, `mcp__the-crew__*` tools), so it can be installed beside savvy-progress; you will usually want only one of them enabled, since both draw a panel.
 
 ## Using it
 
@@ -86,8 +86,8 @@ The profile's name appears under the agent's title, where savvy-flow agents show
 
 ## Tools it adds
 
-- `mcp__crew-progress__progress`: an orchestrator reports the plan, phase and accepted tasks for the progress bar. Only the main session can; a call from a subagent is ignored.
-- `mcp__crew-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). A worker that does not report shows its context fill in grey instead. `savvy-*` workers get one line at the end of their brief asking for these reports.
+- `mcp__the-crew__progress`: an orchestrator reports the plan, phase and accepted tasks for the progress bar. Only the main session can; a call from a subagent is ignored.
+- `mcp__the-crew__step`: a subagent reports its own steps (`done`, `total`, `note`). A worker that does not report shows its context fill in grey instead. `savvy-*` workers get one line at the end of their brief asking for these reports.
 
 Costs are rough estimates from token counts and list prices (as of 2026-10-10), not a bill. Cache writes are priced at the 1-hour rate.
 
@@ -102,7 +102,7 @@ Costs are rough estimates from token counts and list prices (as of 2026-10-10), 
 Set them in `/config`, or in `~/.claude/settings.json`:
 
 ```json
-{ "pluginConfigs": { "crew-progress": { "options": { "language": "en", "autoOpen": "any", "openAtStart": "on" } } } }
+{ "pluginConfigs": { "the-crew": { "options": { "language": "en", "autoOpen": "any", "openAtStart": "on" } } } }
 ```
 
 ## Development

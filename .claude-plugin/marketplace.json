@@ -1,12 +1,12 @@
 {
-  "name": "crew-progress",
+  "name": "the-crew",
   "owner": {
     "name": "Densetsu152637"
   },
-  "description": "crew-progress: a Claude Code mod with an agents panel that shows the main session's own usage and a pixel-crab costume per workflow profile.",
+  "description": "the-crew: a Claude Code mod with an agents panel that shows the main session's own usage and a pixel-crab costume per workflow profile.",
   "plugins": [
     {
-      "name": "crew-progress",
+      "name": "the-crew",
       "source": "./"
     }
   ]

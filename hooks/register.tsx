@@ -5,25 +5,25 @@ import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
 
 import { CLAY, COSTUMES, CRAB_BOX, CRAB_CSS, CRAB_SCALE, crab, colorOf, TIER_COLOR } from './crabs'
 
-// crew-progress: a fork of johnnyvizz's savvy-progress (MIT) that adds the main
+// the-crew: a fork of johnnyvizz's savvy-progress (MIT) that adds the main
 // session's own row and a costume per workflow profile. Every namespace below
 // (state keys, pane, command, tools) is its own, so both mods can load together.
-const flow = atom({ plugin: 'crew-progress', key: 'flow' } as const, null)
-const agents = atom({ plugin: 'crew-progress', key: 'agents' } as const, [])
-const panel = atom({ plugin: 'crew-progress', key: 'panel' } as const, {
+const flow = atom({ plugin: 'the-crew', key: 'flow' } as const, null)
+const agents = atom({ plugin: 'the-crew', key: 'agents' } as const, [])
+const panel = atom({ plugin: 'the-crew', key: 'panel' } as const, {
   isCompact: false,
   isDoneCollapsed: false,
   autoOpenedFor: '',
   viewing: '',
 })
-const now = atom({ plugin: 'crew-progress', key: 'now' } as const, 0)
+const now = atom({ plugin: 'the-crew', key: 'now' } as const, 0)
 // The main session's own usage, drawn as the panel's pinned first row.
-const root = atom({ plugin: 'crew-progress', key: 'root' } as const, null)
+const root = atom({ plugin: 'the-crew', key: 'root' } as const, null)
 // Counts the rows the viewed subagent's conversation has kept: the open thread reads it, so a new row redraws the pane.
-const threadRows = atom({ plugin: 'crew-progress', key: 'threadRows' } as const, 0)
+const threadRows = atom({ plugin: 'the-crew', key: 'threadRows' } as const, 0)
 
-const TOOL = 'mcp__crew-progress__progress'
-const STEP_TOOL = 'mcp__crew-progress__step'
+const TOOL = 'mcp__the-crew__progress'
+const STEP_TOOL = 'mcp__the-crew__step'
 const COMMAND = 'crew'
 const ROOT_ID = 'root'
 // Added to the end of each savvy worker's brief. Their system prompt words step

@@ -60,7 +60,7 @@ export type Panel = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'crew-progress': {
+    'the-crew': {
       flow: Flow | null
       agents: AgentRun[]
       /** The main session's own usage, drawn as the panel's first row. */

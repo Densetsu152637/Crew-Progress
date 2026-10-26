@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-const PLUGIN = 'crew-progress'
+const PLUGIN = 'the-crew'
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const pane = { title: '', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } as const
 const USAGE = { model: 'claude-haiku-4-5', input_tokens: 1000, output_tokens: 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
@@ -23,7 +23,7 @@ const finished = async ($: Engine, on: On) => {
   const clock = mock.clock(on, { now: NOW })
   mock.env(on, { LANG: 'en_US.UTF-8' })
   on('settings.read', async () => ({ value: {} }) as never)
-  on('tool.register', (_$, e) => ({ value: { tool: `mcp__crew-progress__${e.name}` } }))
+  on('tool.register', (_$, e) => ({ value: { tool: `mcp__the-crew__${e.name}` } }))
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', async () => ({ cwd: '/repo' }) as never)
@@ -82,7 +82,7 @@ test('resume: SendMessage to a finished subagent renews its row with the summary
     return { result: { success: true } } as never
   })
   await finished($, on)
-  await $.tool.call({ tool: 'mcp__crew-progress__step', agentId: 'a1', done: 2, total: 2, note: 'old task' } as never)
+  await $.tool.call({ tool: 'mcp__the-crew__step', agentId: 'a1', done: 2, total: 2, note: 'old task' } as never)
   await $.tool.call({ tool: 'SendMessage', to: 'a1', summary: 'Check the edge cases', message: 'Role: leaf; Profile: debugger\nLook again.' } as never)
   expect(during).toBe('Check the edge cases: Haiku 4.5, running')
   const after = await row($, 'Check the edge cases')
