@@ -6,6 +6,13 @@ Version bumps before 0.13.0 were not committed one by one, so entries before 0.1
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-26
+
+First stable release. The [public surface](docs/public-surface.md) now follows semantic versioning: a breaking change to it needs a new major version.
+
+### Changed
+- No code changes from 0.15.0. The [live check](docs/live-check.md) passed in the Claude Code desktop app (2.1.308, Windows).
+
 ## [0.15.0] - 2026-10-26
 
 ### Added
@@ -98,4 +105,5 @@ Version bumps before 0.13.0 were not committed one by one, so entries before 0.1
 ### Added
 - First release as crew-progress, a fork of [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) by johnnyvizz (MIT): the main session's own row (model, effort, context, estimated cost, time), a costume per workflow profile and the panel opening at session start.
 
-[Unreleased]: https://github.com/Densetsu152637/The-Crew/compare/8bb13b7...HEAD
+[Unreleased]: https://github.com/Densetsu152637/The-Crew/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Densetsu152637/The-Crew/releases/tag/v1.0.0
