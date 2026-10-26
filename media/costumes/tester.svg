@@ -5,28 +5,30 @@
 .run .bd{animation:bob .5s steps(1) infinite -.125s}
 .run g{transform-box:fill-box}
 @keyframes st{50%{transform:translateY(-1px)}}@keyframes bob{50%{transform:translateY(1px)}}
-@keyframes blink{50%{opacity:.15}}
+@keyframes blink{50%{opacity:0}}
 .c-root.run .gem{animation:blink 1s steps(1) infinite}
-.c-manager.run .baton{transform-origin:50% 100%;animation:conduct .5s ease-in-out infinite}
+.c-root.run .gem2{animation:blink 1s steps(1) infinite -.5s}
+.c-root.run .spark{animation:blink .5s steps(1) infinite}
+.c-manager.run .baton{transform-origin:50% 100%;animation:conduct .5s steps(1) infinite}
 @keyframes conduct{50%{transform:rotate(-30deg)}}
-.c-explorer.run .lan{transform-origin:50% 0;animation:swing 1s ease-in-out infinite}
-@keyframes swing{25%{transform:rotate(12deg)}75%{transform:rotate(-12deg)}}
-.c-implementer.run .ham{transform-origin:50% 100%;animation:hammer .5s ease-in infinite}
+.c-explorer.run .lan{transform-origin:50% 0;animation:swing 1s steps(1) infinite}
+@keyframes swing{0%{transform:rotate(10deg)}50%{transform:rotate(-10deg)}}
+.c-implementer.run .ham{transform-origin:50% 100%;animation:hammer .5s steps(1) infinite}
 @keyframes hammer{50%{transform:rotate(-40deg)}}
 .c-validator.run .ck{animation:blink .5s steps(1) infinite}
 .c-critic.run .mono{animation:blink 1s steps(1) infinite -.5s}
-.c-documenter.run .quill{transform-origin:0 100%;animation:write .5s ease-in-out infinite}
+.c-documenter.run .quill{transform-origin:0 100%;animation:write .5s steps(1) infinite}
 @keyframes write{50%{transform:rotate(15deg)}}
 .c-tester.run .bub{animation:rise .5s steps(2) infinite}
 @keyframes rise{100%{transform:translateY(-2px);opacity:0}}
-.c-researcher.run .pg{transform-origin:0 50%;animation:leaf 1s ease-in-out infinite}
+.c-researcher.run .pg{transform-origin:0 50%;animation:leaf 1s steps(1) infinite}
 @keyframes leaf{50%{transform:scaleX(-1)}}
-.c-debugger.run .net{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
+.c-debugger.run .net{transform-origin:50% 100%;animation:sweep .5s steps(1) infinite}
 .c-debugger.run .bug{animation:buzz .25s steps(1) infinite}
 @keyframes sweep{50%{transform:rotate(-25deg)}}@keyframes buzz{50%{transform:translate(1px,-1px)}}
-.c-analyst.run .bars{transform-origin:50% 100%;animation:grow 1s ease-in-out infinite}
+.c-analyst.run .bars{transform-origin:50% 100%;animation:grow 1s steps(1) infinite}
 @keyframes grow{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-.c-architect.run .sq{transform-origin:0 100%;animation:measure 1s ease-in-out infinite}
+.c-architect.run .sq{transform-origin:0 100%;animation:measure 1s steps(1) infinite}
 @keyframes measure{50%{transform:rotate(-15deg)}}
 .c-auditor.run .glint{animation:blink .5s steps(1) infinite}
 .c-navigator.run .cur{animation:click .5s steps(1) infinite}
@@ -34,12 +36,12 @@
 @keyframes click{50%{transform:translate(1px,1px)}}
 .c-inspector.run .flash{animation:blink 1s steps(1) infinite}
 .c-inspector.run .note{animation:rise 1s steps(4) infinite}
-.c-generalist.run .blade{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
-.c-guide.run .flag{transform-origin:0 50%;animation:wave .5s ease-in-out infinite}
-@keyframes wave{50%{transform:scaleX(.6)}}
-.c-statusline.run .roller{animation:roll 1s ease-in-out infinite}
+.c-generalist.run .blade{transform-origin:50% 100%;animation:sweep .5s steps(1) infinite}
+.c-guide.run .flag{transform-origin:0 50%;animation:wave .5s steps(1) infinite}
+@keyframes wave{50%{transform:scaleX(.5)}}
+.c-statusline.run .roller{animation:roll 1s steps(2) infinite}
 @keyframes roll{50%{transform:translateX(-4px)}}
 @media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}
 </style>
-<g transform="translate(8,16) scale(4)" opacity="1" shape-rendering="crispEdges"><g class="c-tester run"><g class="bd"><rect x="7" y="10" width="16" height="12" fill="#D97757"/><rect x="3" y="14" width="4" height="4" fill="#D97757"/><rect x="23" y="10" width="4" height="4" fill="#D97757"/><rect x="9" y="12" width="2" height="2" fill="#1F1E1D"/><rect x="19" y="12" width="2" height="2" fill="#1F1E1D"/><rect x="7" y="12" width="16" height="1" fill="#55514C"/><rect x="8" y="11" width="4" height="4" fill="#3A3A3C"/><rect x="18" y="11" width="4" height="4" fill="#3A3A3C"/><rect x="9" y="12" width="2" height="2" fill="rgba(169,214,245,.9)"/><rect x="19" y="12" width="2" height="2" fill="rgba(169,214,245,.9)"/><rect x="25" y="2" width="1" height="1" fill="#C9CCD2"/><rect x="26" y="2" width="1" height="1" fill="#C9CCD2"/><rect x="25" y="3" width="1" height="1" fill="#C9CCD2"/><rect x="26" y="3" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="4" width="1" height="1" fill="#C9CCD2"/><rect x="25" y="4" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="26" y="4" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="27" y="4" width="1" height="1" fill="#C9CCD2"/><rect x="23" y="5" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="25" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="26" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="27" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="28" y="5" width="1" height="1" fill="#C9CCD2"/><rect x="23" y="6" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="25" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="26" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="27" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="28" y="6" width="1" height="1" fill="#C9CCD2"/><rect x="23" y="7" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="25" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="26" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="27" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="28" y="7" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="8" width="1" height="1" fill="#C9CCD2"/><rect x="25" y="8" width="1" height="1" fill="#C9CCD2"/><rect x="26" y="8" width="1" height="1" fill="#C9CCD2"/><rect x="27" y="8" width="1" height="1" fill="#C9CCD2"/><g class="bub"><rect x="25" y="0" width="1" height="1" fill="#FFFFFF"/><rect x="26" y="1" width="1" height="1" fill="#E6E8EE"/></g></g><g class="la"><rect x="7" y="22" width="2" height="4" fill="#D97757"/><rect x="17" y="22" width="2" height="4" fill="#D97757"/></g><g class="lb"><rect x="11" y="22" width="2" height="4" fill="#D97757"/><rect x="21" y="22" width="2" height="4" fill="#D97757"/></g></g></g>
+<g transform="translate(8,16) scale(4)" opacity="1" shape-rendering="crispEdges"><g class="c-tester run"><g class="bd"><rect x="7" y="10" width="16" height="12" fill="#D97757"/><rect x="3" y="14" width="4" height="4" fill="#D97757"/><rect x="23" y="10" width="4" height="4" fill="#D97757"/><rect x="9" y="12" width="2" height="2" fill="#1F1E1D"/><rect x="19" y="12" width="2" height="2" fill="#1F1E1D"/><rect x="7" y="12" width="16" height="1" fill="#55514C"/><rect x="8" y="11" width="4" height="4" fill="#3A3A3C"/><rect x="18" y="11" width="4" height="4" fill="#3A3A3C"/><rect x="9" y="12" width="2" height="2" fill="rgba(169,214,245,.9)"/><rect x="19" y="12" width="2" height="2" fill="rgba(169,214,245,.9)"/><rect x="25" y="2" width="1" height="1" fill="#C9CCD2"/><rect x="26" y="2" width="1" height="1" fill="#C9CCD2"/><rect x="25" y="3" width="1" height="1" fill="#C9CCD2"/><rect x="26" y="3" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="4" width="1" height="1" fill="#C9CCD2"/><rect x="25" y="4" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="26" y="4" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="27" y="4" width="1" height="1" fill="#C9CCD2"/><rect x="23" y="5" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="25" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="26" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="27" y="5" width="1" height="1" fill="rgba(169,214,245,.35)"/><rect x="28" y="5" width="1" height="1" fill="#C9CCD2"/><rect x="23" y="6" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="25" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="26" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="27" y="6" width="1" height="1" fill="#3C7DD9"/><rect x="28" y="6" width="1" height="1" fill="#C9CCD2"/><rect x="23" y="7" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="25" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="26" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="27" y="7" width="1" height="1" fill="#3C7DD9"/><rect x="28" y="7" width="1" height="1" fill="#C9CCD2"/><rect x="24" y="8" width="1" height="1" fill="#C9CCD2"/><rect x="25" y="8" width="1" height="1" fill="#C9CCD2"/><rect x="26" y="8" width="1" height="1" fill="#C9CCD2"/><rect x="27" y="8" width="1" height="1" fill="#C9CCD2"/><g class="bub"><rect x="25" y="0" width="1" height="1" fill="#9CC4EE"/><rect x="26" y="1" width="1" height="1" fill="#BFD4F2"/></g></g><g class="la"><rect x="7" y="22" width="2" height="4" fill="#D97757"/><rect x="17" y="22" width="2" height="4" fill="#D97757"/></g><g class="lb"><rect x="11" y="22" width="2" height="4" fill="#D97757"/><rect x="21" y="22" width="2" height="4" fill="#D97757"/></g></g></g>
 </svg>

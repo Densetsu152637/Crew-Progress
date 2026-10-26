@@ -74,28 +74,30 @@ export const CRAB_CSS = `<style>
 .run .bd{animation:bob .5s steps(1) infinite -.125s}
 .run g{transform-box:fill-box}
 @keyframes st{50%{transform:translateY(-1px)}}@keyframes bob{50%{transform:translateY(1px)}}
-@keyframes blink{50%{opacity:.15}}
+@keyframes blink{50%{opacity:0}}
 .c-root.run .gem{animation:blink 1s steps(1) infinite}
-.c-manager.run .baton{transform-origin:50% 100%;animation:conduct .5s ease-in-out infinite}
+.c-root.run .gem2{animation:blink 1s steps(1) infinite -.5s}
+.c-root.run .spark{animation:blink .5s steps(1) infinite}
+.c-manager.run .baton{transform-origin:50% 100%;animation:conduct .5s steps(1) infinite}
 @keyframes conduct{50%{transform:rotate(-30deg)}}
-.c-explorer.run .lan{transform-origin:50% 0;animation:swing 1s ease-in-out infinite}
-@keyframes swing{25%{transform:rotate(12deg)}75%{transform:rotate(-12deg)}}
-.c-implementer.run .ham{transform-origin:50% 100%;animation:hammer .5s ease-in infinite}
+.c-explorer.run .lan{transform-origin:50% 0;animation:swing 1s steps(1) infinite}
+@keyframes swing{0%{transform:rotate(10deg)}50%{transform:rotate(-10deg)}}
+.c-implementer.run .ham{transform-origin:50% 100%;animation:hammer .5s steps(1) infinite}
 @keyframes hammer{50%{transform:rotate(-40deg)}}
 .c-validator.run .ck{animation:blink .5s steps(1) infinite}
 .c-critic.run .mono{animation:blink 1s steps(1) infinite -.5s}
-.c-documenter.run .quill{transform-origin:0 100%;animation:write .5s ease-in-out infinite}
+.c-documenter.run .quill{transform-origin:0 100%;animation:write .5s steps(1) infinite}
 @keyframes write{50%{transform:rotate(15deg)}}
 .c-tester.run .bub{animation:rise .5s steps(2) infinite}
 @keyframes rise{100%{transform:translateY(-2px);opacity:0}}
-.c-researcher.run .pg{transform-origin:0 50%;animation:leaf 1s ease-in-out infinite}
+.c-researcher.run .pg{transform-origin:0 50%;animation:leaf 1s steps(1) infinite}
 @keyframes leaf{50%{transform:scaleX(-1)}}
-.c-debugger.run .net{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
+.c-debugger.run .net{transform-origin:50% 100%;animation:sweep .5s steps(1) infinite}
 .c-debugger.run .bug{animation:buzz .25s steps(1) infinite}
 @keyframes sweep{50%{transform:rotate(-25deg)}}@keyframes buzz{50%{transform:translate(1px,-1px)}}
-.c-analyst.run .bars{transform-origin:50% 100%;animation:grow 1s ease-in-out infinite}
+.c-analyst.run .bars{transform-origin:50% 100%;animation:grow 1s steps(1) infinite}
 @keyframes grow{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-.c-architect.run .sq{transform-origin:0 100%;animation:measure 1s ease-in-out infinite}
+.c-architect.run .sq{transform-origin:0 100%;animation:measure 1s steps(1) infinite}
 @keyframes measure{50%{transform:rotate(-15deg)}}
 .c-auditor.run .glint{animation:blink .5s steps(1) infinite}
 .c-navigator.run .cur{animation:click .5s steps(1) infinite}
@@ -103,21 +105,22 @@ export const CRAB_CSS = `<style>
 @keyframes click{50%{transform:translate(1px,1px)}}
 .c-inspector.run .flash{animation:blink 1s steps(1) infinite}
 .c-inspector.run .note{animation:rise 1s steps(4) infinite}
-.c-generalist.run .blade{transform-origin:50% 100%;animation:sweep .5s ease-in-out infinite}
-.c-guide.run .flag{transform-origin:0 50%;animation:wave .5s ease-in-out infinite}
-@keyframes wave{50%{transform:scaleX(.6)}}
-.c-statusline.run .roller{animation:roll 1s ease-in-out infinite}
+.c-generalist.run .blade{transform-origin:50% 100%;animation:sweep .5s steps(1) infinite}
+.c-guide.run .flag{transform-origin:0 50%;animation:wave .5s steps(1) infinite}
+@keyframes wave{50%{transform:scaleX(.5)}}
+.c-statusline.run .roller{animation:roll 1s steps(2) infinite}
 @keyframes roll{50%{transform:translateX(-4px)}}
 @media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}
 </style>`
 
 export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
-  // Root: the main session, crowned; the jewels and the sparkle blink.
+  // Root: the main session, crowned; the jewels glint and the sparkle twinkles.
   root: (f, t) => {
     crabBody(f)
     stamp(f, 9, 4, ['g....gg....g', 'gg..gggg..gg', 'gggggggggggg', 'gggggggggggg', 'gggggggggggg', 'dddddddddddd'], { g: t, d: '#A67C00' })
-    f(10, 7, 1, 1, '#D64550', 'gem'); f(14, 7, 2, 1, '#3C7DD9', 'gem'); f(19, 7, 1, 1, '#D64550', 'gem')
-    f(25, 3, 1, 3, '#FFF4C2', 'gem'); f(24, 4, 3, 1, '#FFF4C2', 'gem')
+    f(10, 7, 1, 1, '#D64550'); f(14, 7, 2, 1, '#3C7DD9'); f(19, 7, 1, 1, '#D64550')
+    f(10, 7, 1, 1, '#FFFFFF', 'gem'); f(19, 7, 1, 1, '#FFFFFF', 'gem'); f(14, 7, 1, 1, '#FFFFFF', 'gem2')
+    f(25, 3, 1, 3, '#FFD84D', 'spark'); f(24, 4, 3, 1, '#FFD84D', 'spark')
   },
   // Manager: headset with a mic boom; the baton conducts the crew.
   manager: (f, t) => {
@@ -125,7 +128,7 @@ export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
     stamp(f, 6, 5, ['...kkkkkkkkkkkk...', '.kk............kk.', 'k................k'], { k: '#3A3A3C' })
     f(5, 8, 2, 4, t); f(23, 8, 2, 4, t)
     f(6, 12, 1, 2, '#3A3A3C'); f(7, 14, 3, 1, '#3A3A3C'); f(10, 14, 1, 1, t)
-    f(26, 3, 1, 9, '#F4F3EE', 'baton'); f(26, 2, 1, 1, t, 'baton')
+    f(26, 3, 1, 9, '#C9CCD2', 'baton'); f(26, 2, 1, 1, t, 'baton')
   },
   // Explorer: pith helmet; the lantern swings from the raised claw.
   explorer: (f, t) => {
@@ -161,7 +164,7 @@ export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
   // Documenter: a scroll in one claw and a quill that writes in the other.
   documenter: (f, t) => {
     crabBody(f, -4)
-    stamp(f, 24, 1, ['....w', '...ww', '..wwg', '.wwg.', 'wwg..', 'w....'], { w: '#F4F3EE', g: '#C9C5BA' }, 'quill')
+    stamp(f, 24, 1, ['....w', '...ww', '..wwg', '.wwg.', 'wwg..', 'w....'], { w: '#E6E3D8', g: '#B5B0A0' }, 'quill')
     f(24, 7, 1, 3, INK, 'quill')
     stamp(f, 0, 18, ['rrrrrr', '.pppp.', '.plll.', '.pppp.', '.plll.', 'rrrrrr'], { r: '#C9A66B', p: '#EBD9A8', l: t })
   },
@@ -171,7 +174,7 @@ export const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
     f(7, 12, 16, 1, '#55514C'); f(8, 11, 4, 4, '#3A3A3C'); f(18, 11, 4, 4, '#3A3A3C')
     f(9, 12, 2, 2, 'rgba(169,214,245,.9)'); f(19, 12, 2, 2, 'rgba(169,214,245,.9)')
     stamp(f, 23, 2, ['..gg..', '..gg..', '.gaag.', 'gaaaag', 'gllllg', 'gllllg', '.gggg.'], { g: '#C9CCD2', a: 'rgba(169,214,245,.35)', l: t })
-    f(25, 0, 1, 1, '#FFFFFF', 'bub'); f(26, 1, 1, 1, '#E6E8EE', 'bub')
+    f(25, 0, 1, 1, '#9CC4EE', 'bub'); f(26, 1, 1, 1, '#BFD4F2', 'bub')
   },
   // Researcher: mortarboard with a tassel; the open book's page flips.
   researcher: (f, t) => {
