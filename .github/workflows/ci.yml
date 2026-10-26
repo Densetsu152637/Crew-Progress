@@ -1,0 +1,42 @@
+# Validates the mod the way the engine reads it: manifest and hooks module, the
+# test kit, and the type check against the vendored API (types/vendor). None of
+# these steps call the model API, so no credentials are given to the job.
+# CLAUDE_CODE_VERSION must match the version header of types/vendor/claude-code.d.ts.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CLAUDE_CODE_VERSION: 2.1.308
+  TYPESCRIPT_VERSION: 5.5.4
+jobs:
+  mod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install the Claude Code CLI
+        run: npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Vendored types match the pinned CLI
+        run: |
+          head -n 1 types/vendor/claude-code.d.ts
+          grep -qx "// Written by Claude Code ${CLAUDE_CODE_VERSION}\.\?" types/vendor/claude-code.d.ts
+      - name: Validate the plugin
+        run: claude plugin validate .
+      - name: Run the plugin tests
+        run: claude plugin test .
+      - name: Type check
+        run: npx --yes --package "typescript@${TYPESCRIPT_VERSION}" -- tsc -p .
+      - name: Gallery images match the costumes
+        run: node tools/render-costumes.mjs --check

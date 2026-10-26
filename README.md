@@ -105,11 +105,15 @@ Set them in `/config`, or in `~/.claude/settings.json`:
 
 ## Changes
 
-0.14.1: Russian and Hebrew were removed (the panel is English only, left to right), along with the `language` option.
+See [CHANGELOG.md](CHANGELOG.md). From 1.0.0 the [public surface](docs/public-surface.md) (tool schemas, brief tag, costume mapping, `/crew`, options) follows semantic versioning; [docs/live-check.md](docs/live-check.md) is the manual checklist for the desktop app.
 
 ## Development
 
 `claude plugin validate .` checks the manifest and the hooks module; `claude plugin test .` runs the tests in `hooks/*.test.ts(x)`.
+
+`tsc -p .` type-checks the hooks and the tests against `types/vendor/claude-code.d.ts`, a committed copy of the engine's API declarations, so it works from a clean clone with no engine loaded (TypeScript 5.4 or newer). The engine lays the same file at `.claude-plugin/types/claude-code/index.d.ts` only after it has loaded the mod, which is why the repository does not rely on it. On a Claude Code bump, load the mod once with the new CLI, copy `.claude-plugin/types/claude-code/index.d.ts` over `types/vendor/claude-code.d.ts` (its first line names the version), set `CLAUDE_CODE_VERSION` in `.github/workflows/ci.yml` to the same version, and re-run the checks.
+
+The `CI` workflow (`.github/workflows/ci.yml`) installs the pinned CLI with npm and runs `claude plugin validate .`, `claude plugin test .`, `tsc -p .` and the costume check on every push to `main` and every pull request. None of them calls the model API.
 
 The crab drawings live in `hooks/crabs.ts` (pixel grids, `COSTUMES`, `CRAB_CSS`), which `hooks/register.tsx` imports. After changing a costume, regenerate the gallery images with Node 22.18 or later, which runs the TypeScript directly:
 
@@ -118,7 +122,9 @@ node tools/render-costumes.mjs          # writes media/costumes/<costume>.svg, o
 node tools/render-costumes.mjs --check  # exits 1 when an image is missing, stale or has no costume
 ```
 
-The test harness cannot read files, so the `Costumes` GitHub Actions workflow (`.github/workflows/costumes.yml`) runs the `--check` on every push to `main` and every pull request.
+The test harness cannot read files, so the `Costumes` GitHub Actions workflow (`.github/workflows/costumes.yml`) and the `CI` workflow run the `--check` on every push to `main` and every pull request.
+
+The gallery images are generated, but there is no script for a screenshot of the panel: any panel screenshot is taken by hand in the desktop app (see [docs/live-check.md](docs/live-check.md)).
 
 ## Credits and licence
 

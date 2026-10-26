@@ -46,7 +46,8 @@ test("view: pressing a subagent's row opens its thread in place of the agents", 
   const ui = await mount($, 'desktop')
   // The row's title is the pressable: no separate open button, no title in the row's drawing.
   expect((await ui.find({ type: 'Button', key: 'view-a1' }))?.props.label).toBe('Side work')
-  const row = await ui.find({ type: 'Svg', alt: /^Side work:/ })
+  // ElementQuery has no `alt`: pick the row's drawing by its alt prop.
+  const row = (await ui.findAll({ type: 'Svg' })).find(el => /^Side work:/.test(String(el.props.alt)))
   expect(String(row?.props.source)).not.toContain('>Side work<')
   await ui.press({ key: 'view-a1' })
 
