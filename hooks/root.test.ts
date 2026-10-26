@@ -86,9 +86,13 @@ test('root: desktop draws a crowned row that walks while the turn runs and rests
   await mainTurn($)
   const rootRow = async () => {
     const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
-    const row = (await ui.findAll({ type: 'Svg' })).find(el => String(el.props.alt).startsWith('Main session:'))
+    const svgs = await ui.findAll({ type: 'Svg' })
+    const at = svgs.findIndex(el => String(el.props.alt).startsWith('Main session:'))
+    const row = svgs[at]
+    // The crab is its own drawing, laid over the row's text.
+    const crab = String(svgs[at + 1]?.props.source)
     await ui.unmount()
-    return { alt: String(row?.props.alt), source: String(row?.props.source) }
+    return { alt: String(row?.props.alt), source: String(row?.props.source) + crab }
   }
 
   const working = await rootRow()

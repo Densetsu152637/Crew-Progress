@@ -46,13 +46,14 @@ const spawn = ($: Engine, description: string, subagentType: string, prompt: str
     fork: false,
   } as never)
 
-// The desktop row drawn for `description`: its whole SVG source.
+// The desktop row drawn for `description`: its SVG source, the crab's included.
 const rowOf = async ($: Engine, description: string): Promise<string> => {
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
   const rows = await ui.findAll({ type: 'Svg' })
-  const row = rows.find(el => String(el.props.alt).startsWith(`${description}:`))
+  const at = rows.findIndex(el => String(el.props.alt).startsWith(`${description}:`))
   await ui.unmount()
-  return String(row?.props.source ?? '')
+  // The row's text and, in the drawing laid over it, its crab.
+  return String(rows[at]?.props.source ?? '') + String(rows[at + 1]?.props.alt === '' ? rows[at + 1]?.props.source : '')
 }
 
 // Drawn as `role`: its costume, that costume's prop, and the role word under the title.

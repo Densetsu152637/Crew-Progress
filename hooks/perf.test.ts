@@ -220,3 +220,42 @@ test('thread: closing the thread stops the fetches', async ($, on) => {
   expect(calls.messages).toBe(before)
   await ui.unmount()
 })
+
+// Animations run on the compositor, from the moment an image loads: a drawing whose markup changes is
+// loaded again and every animation in it starts over. So what moves must not change while it runs.
+const moving = async ($: Engine, component: 'Pane' | 'AbovePrompt') => (await sources($, component)).filter(src => src.includes('infinite'))
+
+test('anim: a running row and the running band keep their markup across ticks and redraws', async ($, on) => {
+  const { clock } = await session($, on)
+  await $.tool.call({ tool: PROGRESS, title: 'Ship it', phase: 'delegate', total: 2 } as never)
+  await spawn($)
+  const first = { pane: await moving($, 'Pane'), band: await moving($, 'AbovePrompt') }
+  // The main row is idle: the agent's crab and its pulse, and in the band the twinkle and the crab.
+  expect(first.pane.length).toBeGreaterThan(0)
+  expect(first.band).toHaveLength(1)
+  const stepped = $.turn.step as (e: unknown) => AsyncIterable<unknown>
+  for (const gap of [1000, 300, 700, 1000]) {
+    await clock.advance(gap)
+    if (gap === 300) {
+      for await (const _ of stepped({ index: 0, messageCount: 1, turnId: 's1', model: 'claude-haiku-4-5', agentId: 'a1' })) void _
+      await note($, 'a1', 'More.')
+    }
+    expect(await moving($, 'Pane')).toEqual(first.pane)
+    expect(await moving($, 'AbovePrompt')).toEqual(first.band)
+  }
+})
+
+test('anim: every running drawing carries the CSS that moves it', async ($, on) => {
+  const { clock } = await session($, on)
+  await $.tool.call({ tool: PROGRESS, title: 'Ship it', phase: 'delegate', total: 2 } as never)
+  await $.turn.start({ text: 'go', turnId: 'm1' } as never)
+  await spawn($)
+  for (let i = 0; i < 3; i++) {
+    for (const src of [...(await sources($, 'Pane')), ...(await sources($, 'AbovePrompt'))]) {
+      if (src.includes(' run"')) expect(src).toContain('.run .la{animation')
+      if (src.includes('class="live"')) expect(src).toContain('.live{animation')
+      if (/class="t[0-3]"/.test(src)) expect(src).toContain('@keyframes tw')
+    }
+    await clock.advance(1000)
+  }
+})

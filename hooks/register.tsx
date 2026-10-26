@@ -742,16 +742,21 @@ const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => 
   return svg(
     W,
     66,
-    `${rowCrab(W, 0, 14, costumeOf(a), false, a.status === 'running')}
-${titled ? `<text class="t" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
+    `${titled ? `<text class="t" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
 <text ${startText(W, 42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" ${startText(W, 42, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
 <text class="s" ${endText(W, 42 + barW, 49, true)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
 <rect class="k" x="${mx(W, 42, barW)}" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="${mx(W, 42, fillW)}" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
-${statusMark(mx(W, W - 8), 16, a.status, color)}
 <line class="ln" x1="0" y1="65.5" x2="${W}" y2="65.5"/>`,
   )
 }
+
+// What moves in a row, drawn apart from its text: the crab and the status mark. The text changes
+// every second (the elapsed time) and an image whose markup changes is loaded again, which starts
+// its CSS animations over; this one depends only on the row's costume and state, so it stays as it is.
+const agentMotionSvg = (W: number, a: AgentRun): string =>
+  svg(W, 66, `${rowCrab(W, 0, 14, costumeOf(a), false, a.status === 'running')}
+${statusMark(mx(W, W - 8), 16, a.status, colorOf(roleOf(a)))}`)
 
 const plannedSvg = (W: number, p: Planned): string => {
   const tier = p.tier in TIER_COLOR ? p.tier : 'other'
@@ -1340,6 +1345,8 @@ export const register: Register = (on, options) => {
     // A drawing is rebuilt only when what it shows changed: a run that ended no longer depends on the time.
     const rowKey = (W: number, a: AgentRun, titled: boolean) => JSON.stringify([W, titled, lang, a, a.endedAt === undefined ? at : 0])
     const agentDrawing = (W: number, a: AgentRun, titled = true) => memo.get(`a${rowKey(W, a, titled)}`, () => agentSvg(W, a, at, titled))
+    const motionDrawing = (W: number, a: AgentRun) =>
+      memo.get(`m${JSON.stringify([W, lang, costumeOf(a), roleOf(a), a.status])}`, () => agentMotionSvg(W, a))
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
@@ -1380,15 +1387,31 @@ export const register: Register = (on, options) => {
       // In Hebrew the column hugs the right edge: section heads and buttons right-aligned.
       const align = isRtl() ? 'flex-end' : undefined
 
+      // The crab and status mark of a row, laid over its text: they are their own image, so the
+      // text changing each second does not load them again and restart their animation.
+      const motion = (a: AgentRun) => (
+        <Box position="absolute" top={0} left={0}>
+          <Svg source={motionDrawing(W, a)} alt="" width={W} height={66} />
+        </Box>
+      )
+      // A row's drawing: its text with the motion over it.
+      const drawn = (a: AgentRun, alt: string) => (
+        <Box key={a.id}>
+          <Svg source={agentDrawing(W, a)} alt={alt} width={W} height={66} />
+          {motion(a)}
+        </Box>
+      )
+
       // A subagent's row: pressing its title opens its thread in the pane, in place
       // of the agents (the desktop app keeps its main view to itself). Neither an
       // Svg nor a Box takes a press, so the title is a Button laid over the row.
       const agentRow = (a: AgentRun, state: string) => {
         const alt = `${a.description}: ${modelName(a.model)}, ${state}`
-        if (!a.agentId) return <Svg key={a.id} source={agentDrawing(W, a)} alt={alt} width={W} height={66} />
+        if (!a.agentId) return drawn(a, alt)
         return (
           <Box key={`row-${a.id}`}>
             <Svg source={agentDrawing(W, a, false)} alt={alt} width={W} height={66} />
+            {motion(a)}
             <Box position="absolute" top={0} left={isRtl() ? 0 : 5} right={isRtl() ? 5 : 0} alignItems={isRtl() ? 'flex-end' : 'flex-start'}>
               <Button
                 key={`view-${a.id}`}
@@ -1448,7 +1471,7 @@ export const register: Register = (on, options) => {
         return (
           <Box flexDirection="column" gap={1} alignItems={align}>
             {back('back')}
-            <Svg source={agentDrawing(W, viewing)} alt={`${viewing.description}: ${modelName(viewing.model)}`} width={W} height={66} />
+            {drawn(viewing, `${viewing.description}: ${modelName(viewing.model)}`)}
             {thread.length > 0 ? thread : <Text dimColor>{s.noThread}</Text>}
             {back('back-end')}
           </Box>
@@ -1477,15 +1500,7 @@ export const register: Register = (on, options) => {
           <Box flexDirection="column" position="absolute" top={0} left={0} right={0} alignItems={align}>
             <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
             {toggleCompact}
-            {main && (
-              <Svg
-                key={main.id}
-                source={agentDrawing(W, main)}
-                alt={`${main.description}: ${modelName(main.model)}, ${main.status === 'running' ? s.isRunning : s.isIdle}`}
-                width={W}
-                height={66}
-              />
-            )}
+            {main && drawn(main, `${main.description}: ${modelName(main.model)}, ${main.status === 'running' ? s.isRunning : s.isIdle}`)}
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
             {running.map(a => agentRow(a, s.isRunning))}
