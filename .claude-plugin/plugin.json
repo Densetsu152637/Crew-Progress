@@ -6,6 +6,7 @@
     "name": "Densetsu152637",
     "url": "https://github.com/Densetsu152637"
   },
+  "icon": "./.claude-plugin/icon.png",
   "types": "./types/index.d.ts",
   "userConfig": {
     "autoOpen": {
