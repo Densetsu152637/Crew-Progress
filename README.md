@@ -93,8 +93,6 @@ Costs are rough estimates from token counts and list prices (as of 2026-10-10), 
 
 ## Settings
 
-`language`: `auto` (default), `en`, `ru` or `he`. Hebrew draws the bar and the panel right to left. `auto` follows Claude Code's `language` setting, then the system locale, and falls back to English.
-
 `autoOpen`: `any` (default) or `savvy`. With `any` the panel also opens, once per session, when any subagent starts; with `savvy` only for savvy-flow workers and reported plans.
 
 `openAtStart`: `on` (default) or `off`. With `on` the panel opens when a session starts (once per session, so closing it stays closed); with `off` it opens only per `autoOpen` or `/crew`.
@@ -102,8 +100,12 @@ Costs are rough estimates from token counts and list prices (as of 2026-10-10), 
 Set them in `/config`, or in `~/.claude/settings.json`:
 
 ```json
-{ "pluginConfigs": { "the-crew": { "options": { "language": "en", "autoOpen": "any", "openAtStart": "on" } } } }
+{ "pluginConfigs": { "the-crew": { "options": { "autoOpen": "any", "openAtStart": "on" } } } }
 ```
+
+## Changes
+
+0.14.1: Russian and Hebrew were removed (the panel is English only, left to right), along with the `language` option.
 
 ## Development
 

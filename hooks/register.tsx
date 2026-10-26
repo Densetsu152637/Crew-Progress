@@ -66,10 +66,7 @@ type ProgressInput = {
 }
 
 // ---------------------------------------------------------------------------
-// Language: the `language` option, else Claude Code's `language` setting, else the
-// process locale; English when nothing says Hebrew or Russian.
-
-type Lang = 'en' | 'ru' | 'he'
+// The panel's words, English only (Russian and Hebrew were removed in 0.14.1).
 
 const STRINGS = {
   en: {
@@ -115,120 +112,13 @@ const STRINGS = {
     },
     effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
-  ru: {
-    pane: 'Агенты',
-    cost: 'Стоимость',
-    input: 'Ввод',
-    output: 'Вывод',
-    time: 'Время',
-    collapse: 'Свернуть',
-    expand: 'Развернуть',
-    running: 'Работают',
-    finished: 'Завершены',
-    planned: 'Запланированы',
-    empty: 'Субагентов пока нет.',
-    round: 'раунд',
-    failed: 'ошибка',
-    after: 'после',
-    inWord: 'вход',
-    outWord: 'выход',
-    agentsCount: 'агентов',
-    isRunning: 'работает',
-    isFinished: 'завершён',
-    isPlanned: 'запланирована',
-    opened: 'Панель агентов открыта.',
-    closed: 'Панель агентов закрыта.',
-    done: 'Готово',
-    plan: 'План',
-    design: 'Дизайн',
-    tasks: 'Задачи',
-    review: 'Ревью',
-    busy: 'в работе',
-    ctx: 'ctx',
-    main: 'Основная сессия',
-    isIdle: 'ожидает',
-    backToAgents: 'Агенты',
-    noThread: 'Сообщений пока нет.',
-    tier: {
-      light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other',
-      root: 'root', manager: 'manager', explorer: 'explorer', implementer: 'implementer', validator: 'validator',
-      critic: 'critic', documenter: 'documenter', tester: 'tester', researcher: 'researcher', debugger: 'debugger',
-      analyst: 'analyst', architect: 'architect', auditor: 'auditor', navigator: 'navigator', inspector: 'inspector',
-      generalist: 'универсал', guide: 'гид', statusline: 'строка состояния',
-    },
-    effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
-  },
-  he: {
-    pane: 'סוכנים',
-    cost: 'עלות',
-    input: 'קלט',
-    output: 'פלט',
-    time: 'זמן',
-    collapse: 'כיווץ',
-    expand: 'הרחבה',
-    running: 'פועלים',
-    finished: 'הסתיימו',
-    planned: 'מתוכננים',
-    empty: 'עדיין אין סוכנים.',
-    round: 'סבב',
-    failed: 'שגיאה',
-    after: 'אחרי',
-    inWord: 'קלט',
-    outWord: 'פלט',
-    agentsCount: 'סוכנים',
-    isRunning: 'פועל',
-    isFinished: 'הסתיים',
-    isPlanned: 'מתוכנן',
-    opened: 'חלונית הסוכנים נפתחה.',
-    closed: 'חלונית הסוכנים נסגרה.',
-    done: 'הושלם',
-    plan: 'תכנון',
-    design: 'עיצוב',
-    tasks: 'משימות',
-    review: 'בדיקה',
-    busy: 'בעבודה',
-    ctx: 'הקשר',
-    main: 'השיחה הראשית',
-    isIdle: 'ממתין',
-    backToAgents: 'סוכנים',
-    noThread: 'עדיין אין הודעות.',
-    tier: {
-      light: 'קל', medium: 'בינוני', careful: 'זהיר', heavy: 'כבד', fable: 'פייבל', other: 'אחר',
-      root: 'ראשי', manager: 'מנהל', explorer: 'חוקר', implementer: 'מיישם', validator: 'מאמת',
-      critic: 'מבקר', documenter: 'מתעד', tester: 'בודק', researcher: 'מחקר', debugger: 'מנפה',
-      analyst: 'אנליסט', architect: 'ארכיטקט', auditor: 'מבקר אבטחה', navigator: 'נווט', inspector: 'בוחן',
-      generalist: 'כללי', guide: 'מדריך', statusline: 'שורת מצב',
-    },
-    effort: { low: 'נמוך', medium: 'בינוני', high: 'גבוה', xhigh: 'גבוה מאוד', max: 'מקסימלי' },
-  },
 } as const
 
-// Module scope is fine here: session.start sets it again on every (re)load.
-let lang: Lang = 'en'
-const tr = () => STRINGS[lang]
-
-// Hebrew draws every row mirrored: crab and title on the right, numbers on the left.
-const isRtl = () => lang === 'he'
+const tr = () => STRINGS.en
 
 // Tier and effort words as shown; anything unknown shows as it came.
 const tierWord = (tier: string): string => (tr().tier as Record<string, string>)[tier] ?? tier
 const effortWord = (effort: string): string => (tr().effort as Record<string, string>)[effort] ?? effort
-
-const isRussian = (v: unknown): boolean => typeof v === 'string' && /^(ru|russian|рус)/i.test(v.trim())
-const isHebrew = (v: unknown): boolean => typeof v === 'string' && /^(he|iw|hebrew|עברית)/i.test(v.trim())
-const langOf = (v: unknown): Lang => (isHebrew(v) ? 'he' : isRussian(v) ? 'ru' : 'en')
-
-async function detectLang($: EngineInterface, option: unknown): Promise<Lang> {
-  if (option === 'en' || option === 'ru' || option === 'he') return option
-  try {
-    const settings = (await $.settings.read()) as Record<string, unknown>
-    if (typeof settings.language === 'string' && settings.language.trim()) return langOf(settings.language)
-  } catch {
-    // No settings: fall through to the locale.
-  }
-  const locale = (await $.env.get('LC_ALL')) || (await $.env.get('LC_MESSAGES')) || (await $.env.get('LANG'))
-  return langOf(locale)
-}
 
 const blank = (): Flow => ({
   title: 'savvy-flow',
@@ -355,11 +245,6 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
     rects
       .map((r, i) => (r.length ? `<g${isMoving ? ` class="t${i}"` : ''} fill="${fill}"${extra}>${r.join('')}</g>` : ''))
       .join('')
-  // Positions are worked out left to right; right to left mirrors each box
-  // inside the bar (`bx`) and across the row (`rx`). Text is never mirrored.
-  const rtl = isRtl()
-  const bx = (x: number, w: number): number => (rtl ? BAR_W - x - w : x)
-  const rx = (x: number, w: number): number => (rtl ? W - x - w : x)
 
   // Dithered fill: sparse at the start, dense toward the head.
   const cols = Math.floor(fillW / CELL)
@@ -367,29 +252,28 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   for (let c = 0; c < cols; c++) {
     const density = 0.35 + 0.6 * Math.pow(c / Math.max(1, cols), 1.2)
     for (let r = 0; r < rows; r++) {
-      if (noise(c, r) < density) dots[Math.floor(noise(r, c) * 4)]?.push(`<rect x="${bx(c * CELL + 1, 2)}" y="${r * CELL + 1}" width="2" height="2"/>`)
+      if (noise(c, r) < density) dots[Math.floor(noise(r, c) * 4)]?.push(`<rect x="${c * CELL + 1}" y="${r * CELL + 1}" width="2" height="2"/>`)
     }
   }
   // Handed to workers, not yet accepted: a faint second layer.
   for (let c = cols; c < Math.floor(runW / CELL); c++) {
     for (let r = 0; r < rows; r++) {
-      if (noise(c + 7, r + 3) < 0.2) faint[Math.floor(noise(r + 5, c) * 4)]?.push(`<rect x="${bx(c * CELL + 1, 1.7)}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
+      if (noise(c + 7, r + 3) < 0.2) faint[Math.floor(noise(r + 5, c) * 4)]?.push(`<rect x="${c * CELL + 1}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
     }
   }
 
   const ticks: string[] = []
   for (let i = 1; i < f.total; i++) {
     const x = Math.round((BAR_W * i) / f.total)
-    if (x > fillW + 4) ticks.push(`<rect x="${bx(x, 1.5)}" y="${BAR_H / 2 - 4}" width="1.5" height="8" rx="0.75"/>`)
+    if (x > fillW + 4) ticks.push(`<rect x="${x}" y="${BAR_H / 2 - 4}" width="1.5" height="8" rx="0.75"/>`)
   }
 
   const text = label(f)
   const pillW = Math.round(18 + text.length * 6.6)
-  const pillX = bx(Math.max(0, Math.min(BAR_W - pillW, fillW - pillW)), pillW)
+  const pillX = Math.max(0, Math.min(BAR_W - pillW, fillW - pillW))
   const percent = `${Math.round(ratio(f) * 100)}%`
-  // `direction="rtl"` puts Hebrew words and numbers in reading order; `start` is then the right edge.
-  const titleAt = rtl ? `x="${W - 16}" direction="rtl" text-anchor="start"` : 'x="16"'
-  const percentAt = rtl ? `x="${CRAB_W + 6}" y="${H / 2 + 4.5}"` : `x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end"`
+  const titleAt = 'x="16"'
+  const percentAt = `x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end"`
   const crabW = CRAB_BOX * 0.8
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -398,9 +282,9 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 @media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}.k{fill:#2c2c2c}.tk{fill:#5a5a5a}}
 ${isMoving ? BAR_MOTION_CSS : ''}</style>
 <defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath></defs>
-<circle cx="${rtl ? W - 5 : 5}" cy="${H / 2}" r="4" fill="${color}"/>
+<circle cx="5" cy="${H / 2}" r="4" fill="${color}"/>
 <text class="t" ${titleAt} y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
-<g transform="translate(${rx(BAR_X, BAR_W)},${y0})">
+<g transform="translate(${BAR_X},${y0})">
 <rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
 <g clip-path="url(#c)">
 ${group(dots, color)}
@@ -408,10 +292,10 @@ ${group(faint, color, ' opacity="0.45"')}
 <g class="tk">${ticks.join('')}</g>
 </g>
 <rect x="${pillX}" width="${pillW}" height="${BAR_H}" rx="${BAR_H / 2}" fill="${color}"/>
-<text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle"${rtl ? ' direction="rtl"' : ''} font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
+<text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
 </g>
 <text class="m" ${percentAt} font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${percent}</text>
-${isWorking ? CRAB_CSS : ''}${crab(rx(W - CRAB_W + 1, crabW), 0, 'other', false, isWorking, 0.8, rtl)}
+${isWorking ? CRAB_CSS : ''}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
 </svg>`
 }
 
@@ -431,7 +315,7 @@ const TIER_MODEL: Record<string, [model: string, effort: string]> = {
   light: ['Opus', 'low'],
 }
 
-// "Opus · xhigh", with the effort word in the panel's language; '' for an unknown tier.
+// "Opus · xhigh", with the effort word; '' for an unknown tier.
 const tierModel = (tier: string): string => {
   const m = TIER_MODEL[tier]
   return m ? `${m[0]} · ${effortWord(m[1])}` : ''
@@ -544,7 +428,7 @@ const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, 
 const fmtTokens = (n: number): string =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : `${Math.round(n)}`
 
-// "12M in · 45k out", the words in the panel's language.
+// "12M in · 45k out".
 const fmtInOut = (t: { input: number; output: number }): string => `${fmtTokens(t.input)} ${tr().inWord} · ${fmtTokens(t.output)} ${tr().outWord}`
 
 const fmtCost = (usd: number): string => `$${usd < 10 ? usd.toFixed(2) : usd.toFixed(1)}`
@@ -652,27 +536,15 @@ const statusMark = (x: number, y: number, status: string, color: string): string
   return `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="#9a9a96" stroke-width="1.4"/><path d="M${x} ${y - 2.5}v2.8l1.8 1.2" fill="none" stroke="#9a9a96" stroke-width="1.4" stroke-linecap="round"/>`
 }
 
-// Panel rows are laid out left to right; in Hebrew each box mirrors across the
-// row (`mx`) and text hugs the mirrored side. `words` text may hold Hebrew and
-// takes `direction="rtl"` (whose `start` is the right edge); numbers stay
-// left to right so "≈$0.25" keeps its order.
-const mx = (W: number, x: number, w = 0): number => (isRtl() ? W - x - w : x)
-
-// Text that starts at x: left-aligned, or right-aligned at the mirrored x.
-const startText = (W: number, x: number, y: number, words = true): string =>
-  !isRtl()
-    ? `x="${x}" y="${y}"`
-    : `x="${W - x}" y="${y}"${words ? ' direction="rtl" text-anchor="start"' : ' text-anchor="end"'}`
-
-// Text that ends at x: right-aligned, or left-aligned at the mirrored x.
-const endText = (W: number, x: number, y: number, words = false): string =>
-  !isRtl() ? `x="${x}" y="${y}" text-anchor="end"` : `x="${W - x}" y="${y}"${words ? ' direction="rtl" text-anchor="end"' : ''}`
+// Text that starts at x, and text that ends at x (right-aligned).
+const startText = (x: number, y: number): string => `x="${x}" y="${y}"`
+const endText = (x: number, y: number): string => `x="${x}" y="${y}" text-anchor="end"`
 
 const crabWidth = (scale: number): number => Math.round(CRAB_BOX * scale * 100) / 100
 
-// A panel crab at x in a row of width W: on the mirrored side and facing left in Hebrew.
-const rowCrab = (W: number, x: number, y: number, costume: string, dim = false, isWalking = false): string =>
-  crab(mx(W, x, crabWidth(CRAB_SCALE)), y, costume, dim, isWalking, CRAB_SCALE, isRtl())
+// A panel crab at x.
+const rowCrab = (x: number, y: number, costume: string, dim = false, isWalking = false): string =>
+  crab(x, y, costume, dim, isWalking, CRAB_SCALE)
 
 // A thread in the pane: its newest messages, each cut to THREAD_TEXT, as many as fit
 // THREAD_CHARS. A drawing holds 100000 characters and cuts from the end, which is
@@ -701,13 +573,13 @@ const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): stri
   const size = tw >= 80 ? 15 : 13
   const top = title ? 28 : 0
   const tile = (i: number, k: string, v: string) =>
-    `<rect class="tile" x="${mx(W, i * (tw + gap), tw)}" y="${top}" width="${tw}" height="40" rx="8"/>
-<text class="s" ${startText(W, i * (tw + gap) + 9, top + 16)} font-family="${FONT}" font-size="11">${k}</text>
-<text class="t" ${startText(W, i * (tw + gap) + 9, top + 33, false)} font-family="${FONT}" font-size="${size}" font-weight="600" font-variant-numeric="tabular-nums">${v}</text>`
+    `<rect class="tile" x="${i * (tw + gap)}" y="${top}" width="${tw}" height="40" rx="8"/>
+<text class="s" ${startText(i * (tw + gap) + 9, top + 16)} font-family="${FONT}" font-size="11">${k}</text>
+<text class="t" ${startText(i * (tw + gap) + 9, top + 33)} font-family="${FONT}" font-size="${size}" font-weight="600" font-variant-numeric="tabular-nums">${v}</text>`
   return svg(
     W,
     headerHeight(title),
-    `${title ? `<text class="t" ${startText(W, 0, 15)} font-family="${FONT}" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>` : ''}
+    `${title ? `<text class="t" ${startText(0, 15)} font-family="${FONT}" font-size="14" font-weight="600">${xml(fitText(title, 14, W))}</text>` : ''}
 ${tile(0, s.cost, '≈' + fmtCost(t.cost))}${tile(1, s.input, fmtTokens(t.input))}${tile(2, s.output, fmtTokens(t.output))}${tile(3, s.time, fmtTime(t.time))}`,
   )
 }
@@ -750,11 +622,11 @@ const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => 
   return svg(
     TW,
     66,
-    `${titled ? `<text class="t" ${startText(TW, 2, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
-<text ${startText(TW, 2, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
-${steps && stepsW > 30 ? `<text class="t" ${startText(TW, 2, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
-<text class="s" ${endText(TW, 2 + barW, 49, true)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
-<rect class="k" x="${mx(TW, 2, barW)}" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="${mx(TW, 2, fillW)}" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
+    `${titled ? `<text class="t" ${startText(2, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
+<text ${startText(2, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
+${steps && stepsW > 30 ? `<text class="t" ${startText(2, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
+<text class="s" ${endText(2 + barW, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
+<rect class="k" x="2" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="2" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
 <line class="ln" x1="0" y1="65.5" x2="${TW}" y2="65.5"/>`,
   )
 }
@@ -768,10 +640,10 @@ const statusWord = (status: string): string => {
 const rowLine = (w: number): string => `<line class="ln" x1="0" y1="65.5" x2="${w}" y2="65.5"/>`
 
 const agentCrabSvg = (a: AgentRun): string =>
-  svg(CRAB_COL, 66, `${rowCrab(CRAB_COL, 0, 14, costumeOf(a), false, a.status === 'running')}${rowLine(CRAB_COL)}`)
+  svg(CRAB_COL, 66, `${rowCrab(0, 14, costumeOf(a), false, a.status === 'running')}${rowLine(CRAB_COL)}`)
 
 const agentMarkSvg = (a: AgentRun): string =>
-  svg(MARK_COL, 66, `${statusMark(isRtl() ? 8 : MARK_COL - 8, 16, a.status, colorOf(roleOf(a)))}${rowLine(MARK_COL)}`)
+  svg(MARK_COL, 66, `${statusMark(MARK_COL - 8, 16, a.status, colorOf(roleOf(a)))}${rowLine(MARK_COL)}`)
 
 const plannedSvg = (W: number, p: Planned): string => {
   const tier = p.tier in TIER_COLOR ? p.tier : 'other'
@@ -782,10 +654,10 @@ const plannedSvg = (W: number, p: Planned): string => {
   return svg(
     W,
     46,
-    `${rowCrab(W, 0, 6, 'other', true)}
-<text class="s" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(`${p.n}. ${p.title}`, 13, textW))}</text>
-<text ${startText(W, 42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tierWord(tier))}</tspan><tspan class="m">  ${xml(meta.filter(Boolean).join('  ·  '))}</tspan></text>
-${statusMark(mx(W, W - 8), 16, 'planned', color)}
+    `${rowCrab(0, 6, 'other', true)}
+<text class="s" ${startText(42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(`${p.n}. ${p.title}`, 13, textW))}</text>
+<text ${startText(42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tierWord(tier))}</tspan><tspan class="m">  ${xml(meta.filter(Boolean).join('  ·  '))}</tspan></text>
+${statusMark(W - 8, 16, 'planned', color)}
 <line class="ln" x1="0" y1="45.5" x2="${W}" y2="45.5"/>`,
   )
 }
@@ -802,13 +674,13 @@ const compactSvg = (W: number, list: AgentRun[], planned: Planned[]): string => 
   const shown = icons.slice(0, fit)
   const more = icons.length - shown.length
   const body = shown
-    .map((ic, i) => rowCrab(W, i * 36, 0, ic.k, ic.dim, ic.s === 'running') + (ic.s === 'running' ? `<circle class="live" cx="${mx(W, i * 36 + 32)}" cy="4" r="3" fill="${ic.c}"/>` : ''))
+    .map((ic, i) => rowCrab(i * 36, 0, ic.k, ic.dim, ic.s === 'running') + (ic.s === 'running' ? `<circle class="live" cx="${i * 36 + 32}" cy="4" r="3" fill="${ic.c}"/>` : ''))
     .join('')
   const x = shown.length * 36 + (more ? 4 : 0)
   return svg(
     W,
     32,
-    `${body}${more ? `<text class="s" ${startText(W, x, 21, false)} font-family="${FONT}" font-size="12">+${more}</text>` : ''}`,
+    `${body}${more ? `<text class="s" ${startText(x, 21)} font-family="${FONT}" font-size="12">+${more}</text>` : ''}`,
   )
 }
 
@@ -851,7 +723,7 @@ const withContext = (r: AgentRun, c: SessionContextUsage): AgentRun => ({
 // The prompt side, cache reads and writes included, as the status line counts the window.
 const inputOf = (u: Usage): number => (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0)
 
-// The row as drawn: its title in the panel's language.
+// The row as drawn: its title.
 const rootRow = (r: AgentRun | null): AgentRun | null => (r ? { ...r, description: tr().main } : null)
 
 // Drawings kept between redraws, keyed by everything a drawing depends on, so a row
@@ -973,7 +845,6 @@ async function tick($: EngineInterface): Promise<void> {
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    lang = await detectLang($, options.language)
     // A reload starts from nothing: no timer of the old module, no drawing kept.
     ticker?.timer.cancel()
     ticker = undefined
@@ -1358,10 +1229,10 @@ export const register: Register = (on, options) => {
     memo.begin()
     if (!isThread) threads.clear()
     // A drawing is rebuilt only when what it shows changed: a run that ended no longer depends on the time.
-    const rowKey = (W: number, a: AgentRun, titled: boolean) => JSON.stringify([W, titled, lang, a, a.endedAt === undefined ? at : 0])
+    const rowKey = (W: number, a: AgentRun, titled: boolean) => JSON.stringify([W, titled, a, a.endedAt === undefined ? at : 0])
     const agentDrawing = (W: number, a: AgentRun, titled = true) => memo.get(`a${rowKey(W, a, titled)}`, () => agentSvg(W, a, at, titled))
-    const crabDrawing = (a: AgentRun) => memo.get(`c${JSON.stringify([lang, costumeOf(a), a.status])}`, () => agentCrabSvg(a))
-    const markDrawing = (a: AgentRun) => memo.get(`k${JSON.stringify([lang, roleOf(a), a.status])}`, () => agentMarkSvg(a))
+    const crabDrawing = (a: AgentRun) => memo.get(`c${JSON.stringify([costumeOf(a), a.status])}`, () => agentCrabSvg(a))
+    const markDrawing = (a: AgentRun) => memo.get(`k${JSON.stringify([roleOf(a), a.status])}`, () => agentMarkSvg(a))
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
@@ -1382,7 +1253,7 @@ export const register: Register = (on, options) => {
     const toggleDone = (
       <Button
         key="done"
-        label={`${p.isDoneCollapsed ? (isRtl() ? '◂' : '▸') : '▾'} ${s.finished} · ${finished.length}`}
+        label={`${p.isDoneCollapsed ? '▸' : '▾'} ${s.finished} · ${finished.length}`}
         plain
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
@@ -1399,19 +1270,16 @@ export const register: Register = (on, options) => {
         </Text>
       )
 
-      // In Hebrew the column hugs the right edge: section heads and buttons right-aligned.
-      const align = isRtl() ? 'flex-end' : undefined
-
-      // A row's drawing: crab, text and status mark side by side (mirrored in Hebrew), each its own
+      // A row's drawing: crab, text and status mark side by side each its own
       // image so the text changing each second does not load the other two again. With `view`, the
       // title is a Button laid over the text.
       const drawn = (a: AgentRun, alt: string, view = false) => (
-        <Box key={view ? `row-${a.id}` : a.id} flexDirection={isRtl() ? 'row-reverse' : 'row'}>
+        <Box key={view ? `row-${a.id}` : a.id} flexDirection="row">
           <Svg source={crabDrawing(a)} alt={`${costumeOf(a)} crab`} width={CRAB_COL} height={66} />
           <Svg source={agentDrawing(W, a, !view)} alt={alt} width={rowTextW(W)} height={66} />
           <Svg source={markDrawing(a)} alt={statusWord(a.status)} width={MARK_COL} height={66} />
           {view && (
-            <Box position="absolute" top={0} left={isRtl() ? 0 : 5} right={isRtl() ? 5 : 0} alignItems={isRtl() ? 'flex-end' : 'flex-start'}>
+            <Box position="absolute" top={0} left={5} right={0} alignItems="flex-start">
               <Button
                 key={`view-${a.id}`}
                 label={fitText(a.description || a.type, 13, W - 42 - 22)}
@@ -1438,7 +1306,7 @@ export const register: Register = (on, options) => {
         const back = (key: string) => (
           <Button
             key={key}
-            label={`${isRtl() ? '›' : '‹'} ${s.backToAgents}`}
+            label={`‹ ${s.backToAgents}`}
             plain
             onPress={async () => {
               await update($, panel, prev => ({ ...prev, viewing: '' }))
@@ -1476,7 +1344,7 @@ export const register: Register = (on, options) => {
                 )),
               ])
         return (
-          <Box flexDirection="column" gap={1} alignItems={align}>
+          <Box flexDirection="column" gap={1}>
             {back('back')}
             {drawn(viewing, `${viewing.description}: ${modelName(viewing.model)}`)}
             {thread.length > 0 ? thread : <Text dimColor>{s.noThread}</Text>}
@@ -1487,7 +1355,7 @@ export const register: Register = (on, options) => {
 
       if (p.isCompact) {
         return (
-          <Box flexDirection="column" alignItems={align}>
+          <Box flexDirection="column">
             <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
             {toggleCompact}
             <Svg source={compactSvg(W, everyone, planned)} alt={`${list.length} ${s.agentsCount}`} width={W} height={32} />
@@ -1504,7 +1372,7 @@ export const register: Register = (on, options) => {
           {gridTiles(gridH).map((tileH, i) => (
             <Svg key={`grid-${i}`} source={memo.get(`g${W}x${tileH}`, () => gridSvg(W, tileH))} alt="dotted grid" width={W} height={tileH} />
           ))}
-          <Box flexDirection="column" position="absolute" top={0} left={0} right={0} alignItems={align}>
+          <Box flexDirection="column" position="absolute" top={0} left={0} right={0}>
             <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
             {toggleCompact}
             {main && drawn(main, `${main.description}: ${modelName(main.model)}, ${main.status === 'running' ? s.isRunning : s.isIdle}`)}
@@ -1516,7 +1384,7 @@ export const register: Register = (on, options) => {
               finished.map(a => agentRow(a, s.isFinished))}
             {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
             {planned.map(pl => (
-              <Svg key={`plan-${pl.n}`} source={memo.get(`p${JSON.stringify([W, lang, pl])}`, () => plannedSvg(W, pl))} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
+              <Svg key={`plan-${pl.n}`} source={memo.get(`p${JSON.stringify([W, pl])}`, () => plannedSvg(W, pl))} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
             ))}
           </Box>
         </Box>
@@ -1647,7 +1515,7 @@ export const register: Register = (on, options) => {
       const width = Math.max(180, Math.min(1600, (e.props.bodyColumns || 100) * 8 - 96))
       return (
         <Box flexDirection="column">
-          <Box flexDirection={isRtl() ? 'row-reverse' : 'row'} alignItems="center" gap={1}>
+          <Box flexDirection="row" alignItems="center" gap={1}>
             <Svg source={rowSvg(f, width, isWorking)} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
             {crewButton}
             {dismiss}
