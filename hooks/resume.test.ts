@@ -105,7 +105,11 @@ test('resume: a refused SendMessage leaves the row finished', async ($, on) => {
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, finished')
 })
 
-test("resume: a row stored in a finished subagent's conversation puts it back to running, with no polling", async ($, on) => {
+// A row as the engine stores it for a reused agent's loop, by the door it came in by.
+const stored = ($: Engine, door: string, text: string) =>
+  ($.session.append as (a: unknown) => Promise<unknown>)({ message: { type: 'user', content: [{ type: 'text', text }] }, agentId: 'a1', door, origin: { kind: 'engine' }, uuid: `u-${door}` })
+
+test("resume: a prompt or delivery stored in a finished subagent's conversation puts it back to running, with no polling", async ($, on) => {
   let listed = 0
   on('agent.list', () => {
     listed++
@@ -115,8 +119,16 @@ test("resume: a row stored in a finished subagent's conversation puts it back to
   const clock = await finished($, on)
   await clock.advance(60_000)
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, finished')
-  // A task handed to it is a row of its own conversation.
-  await $.session.append({ message: { type: 'user', content: [{ type: 'text', text: 'One more thing.' }] }, agentId: 'a1' } as never)
-  expect((await row($)).alt).toBe('Side work: Haiku 4.5, running')
+  await stored($, 'delivery', 'One more thing.')
+  expect((await row($, 'One more thing.')).alt).toBe('One more thing.: Haiku 4.5, running')
   expect(listed).toBe(0)
+})
+
+test('resume: a response or tool result stored after the turn completed leaves the agent finished', async ($, on) => {
+  mock.session(on)
+  await finished($, on)
+  await stored($, 'response', 'Late words.')
+  await stored($, 'tool-result', 'Late result.')
+  await stored($, 'note', 'A note.')
+  expect((await row($)).alt).toBe('Side work: Haiku 4.5, finished')
 })

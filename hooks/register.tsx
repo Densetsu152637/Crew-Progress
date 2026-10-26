@@ -776,8 +776,9 @@ async function scrollPane($: EngineInterface, to: 'start' | 'end'): Promise<void
 let viewingAgent = ''
 // Finished subagents (by agent id): a row stored in the conversation of one of these means it was reused.
 const finishedAgents = new Set<string>()
-// The rows that are no part of a task: the engine's notices, context blocks, attachments and compaction.
-const NOT_TASK_DOORS = new Set(['notice', 'hook-context', 'attachment', 'compaction', 'queue'])
+// A reused subagent always starts from a new input: a brief (`prompt`) or a message sent to it (`delivery`).
+// Its replies and tool results after it finished are not reuse.
+const REUSE_DOORS = new Set(['prompt', 'delivery'])
 
 async function openThread($: EngineInterface, id: string, agentId: string, refresh: () => void): Promise<void> {
   viewingAgent = agentId
@@ -1175,13 +1176,13 @@ export const register: Register = (on, options) => {
     const stored = await next(e)
     const agentId = e.agentId
     if (!agentId || stored.deny !== undefined) return stored
-    if (finishedAgents.has(agentId) && !NOT_TASK_DOORS.has(e.door)) {
+    if (finishedAgents.has(agentId) && REUSE_DOORS.has(e.door)) {
       finishedAgents.delete(agentId)
       const at = await $.clock.now()
-      // A row that carries a message is the new task's brief.
+      // The row carries the new task's brief.
       const content = e.message.content as unknown
       const text = Array.isArray(content) ? content.map(b => (b as { text?: unknown }).text).find(t => typeof t === 'string') : content
-      const prompt = e.door === 'prompt' || e.door === 'delivery' ? (typeof text === 'string' ? text : undefined) : undefined
+      const prompt = typeof text === 'string' ? text : undefined
       await update($, agents, list => renew(list, agentId, at, { prompt }))
       await update($, now, () => at)
       await syncTicker($)
