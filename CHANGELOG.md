@@ -6,11 +6,18 @@ Version bumps before 0.13.0 were not committed one by one, so entries before 0.1
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-26
+
 ### Added
 - `tsc -p .` now passes from a clean clone: the engine's API declarations are vendored at `types/vendor/claude-code.d.ts` (pinned to Claude Code 2.1.308) and `tsconfig.json` is self-contained.
 - A `CI` GitHub Actions workflow runs `claude plugin validate .`, `claude plugin test .`, `tsc -p .` and the costume check on every push to `main` and every pull request.
 - A plugin icon (`.claude-plugin/icon.png`, the root crab), so `claude plugin validate .` reports no warnings.
 - [docs/public-surface.md](docs/public-surface.md), the surface frozen for 1.0, and [docs/live-check.md](docs/live-check.md), a manual checklist for the desktop app.
+
+### Changed
+- A reused subagent is detected from its own events (a new prompt or delivered message in its conversation) instead of a 5-second poll, so no timer runs once every agent has finished.
+- The progress bar's twinkle restarts in phase when its inputs change, and its drawing is reused while they don't.
+- The hook that keeps an open thread current does no state reads unless the stored row belongs to the viewed or a finished agent.
 
 ### Fixed
 - `hooks/view.test.ts` no longer queries a nonexistent `alt` field of the test kit's element query; it finds the row's drawing by its `alt` prop.
