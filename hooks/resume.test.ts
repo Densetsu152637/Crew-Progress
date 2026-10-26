@@ -109,9 +109,10 @@ test('resume: a finished row the engine lists as running again moves under Runni
   let status = 'completed'
   on('agent.list', () => ({ value: [{ id: 'a1', description: 'Side work', type: 'general-purpose', status }] }) as never)
   const clock = await finished($, on)
-  await clock.advance(1000)
+  // With only finished rows the panel polls the engine's list slowly, every five seconds.
+  await clock.advance(5000)
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, finished')
   status = 'running'
-  await clock.advance(1000)
+  await clock.advance(5000)
   expect((await row($)).alt).toBe('Side work: Haiku 4.5, running')
 })

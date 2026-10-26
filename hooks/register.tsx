@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, SessionContextUsage, SessionUsage } from 'claude-code'
+import type { EngineInterface, Register, SessionContextUsage, SessionMessage, SessionUsage, Timer } from 'claude-code'
 
 import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
 
@@ -328,6 +328,13 @@ const fitText = (s: string, size: number, maxW: number): string => {
   return out + '…'
 }
 
+// Pixels twinkle in four out-of-phase groups while the bar's work runs.
+const BAR_MOTION_CSS = `.t0,.t1,.t2,.t3{animation:tw 2.2s ease-in-out infinite}
+.t1{animation-duration:2.8s;animation-delay:-.7s}.t2{animation-duration:1.9s;animation-delay:-1.3s}.t3{animation-duration:3.3s;animation-delay:-.4s}
+@keyframes tw{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}
+`
+
 const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   // The title takes what it needs, up to 40% of the row; the bar takes the rest.
   const title = fitText(f.title, 13, Math.max(60, W * 0.4))
@@ -337,7 +344,15 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   const y0 = (H - BAR_H) / 2
   const fillW = Math.round(BAR_W * ratio(f))
   const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + f.running)) / f.total) : 0
-  const dots: string[] = []
+  // Only a bar with work under way moves; a finished or waiting one is still, with no animation at all.
+  const isMoving = isWorking && !f.isFinished
+  // The pixels twinkle in four out-of-phase groups, so four elements animate, not hundreds of rects.
+  const dots: string[][] = [[], [], [], []]
+  const faint: string[][] = [[], [], [], []]
+  const group = (rects: string[][], fill: string, extra = ''): string =>
+    rects
+      .map((r, i) => (r.length ? `<g${isMoving ? ` class="t${i}"` : ''} fill="${fill}"${extra}>${r.join('')}</g>` : ''))
+      .join('')
   // Positions are worked out left to right; right to left mirrors each box
   // inside the bar (`bx`) and across the row (`rx`). Text is never mirrored.
   const rtl = isRtl()
@@ -350,14 +365,13 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   for (let c = 0; c < cols; c++) {
     const density = 0.35 + 0.6 * Math.pow(c / Math.max(1, cols), 1.2)
     for (let r = 0; r < rows; r++) {
-      if (noise(c, r) < density) dots.push(`<rect class="t${Math.floor(noise(r, c) * 4)}" x="${bx(c * CELL + 1, 2)}" y="${r * CELL + 1}" width="2" height="2"/>`)
+      if (noise(c, r) < density) dots[Math.floor(noise(r, c) * 4)]?.push(`<rect x="${bx(c * CELL + 1, 2)}" y="${r * CELL + 1}" width="2" height="2"/>`)
     }
   }
   // Handed to workers, not yet accepted: a faint second layer.
-  const faint: string[] = []
   for (let c = cols; c < Math.floor(runW / CELL); c++) {
     for (let r = 0; r < rows; r++) {
-      if (noise(c + 7, r + 3) < 0.2) faint.push(`<rect class="t${Math.floor(noise(r + 5, c) * 4)}" x="${bx(c * CELL + 1, 1.7)}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
+      if (noise(c + 7, r + 3) < 0.2) faint[Math.floor(noise(r + 5, c) * 4)]?.push(`<rect x="${bx(c * CELL + 1, 1.7)}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
     }
   }
 
@@ -380,27 +394,22 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 <style>
 .t{fill:#1f1f1f}.m{fill:#8a8a8a}.k{fill:#e4e4e2}.tk{fill:#b4b4b0}
 @media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}.k{fill:#2c2c2c}.tk{fill:#5a5a5a}}
-/* Pixels twinkle in four out-of-phase groups; a finished bar settles to a slow glow. */
-.t0,.t1,.t2,.t3{animation:tw ${f.isFinished ? 3.2 : 2.2}s ease-in-out infinite}
-.t1{animation-duration:${f.isFinished ? 3.8 : 2.8}s;animation-delay:-.7s}.t2{animation-duration:${f.isFinished ? 4.4 : 1.9}s;animation-delay:-1.3s}.t3{animation-duration:${f.isFinished ? 3.5 : 3.3}s;animation-delay:-.4s}
-@keyframes tw{0%,100%{opacity:1}50%{opacity:${f.isFinished ? 0.8 : 0.3}}}
-@media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}
-</style>
+${isMoving ? BAR_MOTION_CSS : ''}</style>
 <defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath></defs>
 <circle cx="${rtl ? W - 5 : 5}" cy="${H / 2}" r="4" fill="${color}"/>
 <text class="t" ${titleAt} y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
 <g transform="translate(${rx(BAR_X, BAR_W)},${y0})">
 <rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
 <g clip-path="url(#c)">
-<g fill="${color}">${dots.join('')}</g>
-<g fill="${color}" opacity="0.45">${faint.join('')}</g>
+${group(dots, color)}
+${group(faint, color, ' opacity="0.45"')}
 <g class="tk">${ticks.join('')}</g>
 </g>
 <rect x="${pillX}" width="${pillW}" height="${BAR_H}" rx="${BAR_H / 2}" fill="${color}"/>
 <text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle"${rtl ? ' direction="rtl"' : ''} font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
 </g>
 <text class="m" ${percentAt} font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${percent}</text>
-${CRAB_CSS}${crab(rx(W - CRAB_W + 1, crabW), 0, 'other', false, isWorking, 0.8, rtl)}
+${isWorking ? CRAB_CSS : ''}${crab(rx(W - CRAB_W + 1, crabW), 0, 'other', false, isWorking, 0.8, rtl)}
 </svg>`
 }
 
@@ -626,9 +635,11 @@ const gridSvg = (W: number, H: number) => `<svg xmlns="http://www.w3.org/2000/sv
 const PANE_CSS = `<style>
 .t{fill:#1f1f1f}.s{fill:#6b6b68}.m{fill:#9a9a96}.k{fill:#ecebe8}.ln{stroke:#e4e4e1}.tile{fill:#f4f3f0}
 @media (prefers-color-scheme: dark){.t{fill:#ececec}.s{fill:#a8a8a4}.m{fill:#7d7d79}.k{fill:#2c2c2b}.ln{stroke:#333331}.tile{fill:#262625}}
-.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}
-@media (prefers-reduced-motion: reduce){.live{animation:none}}
 </style>`
+
+// Only a drawing with a running mark carries this; finished and idle drawings hold no animation.
+const LIVE_CSS = `<style>.live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){.live{animation:none}}</style>`
 
 const statusMark = (x: number, y: number, status: string, color: string): string => {
   if (status === 'running') return `<circle class="live" cx="${x}" cy="${y}" r="3.5" fill="${color}"/>`
@@ -674,8 +685,10 @@ const toolLine = (use: { tool: string; input: Record<string, unknown> }): string
   return typeof arg === 'string' ? `${name} · ${arg.replace(/\s+/g, ' ')}` : name
 }
 
+// Each row is its own SVG, so each carries the motion CSS only when its body uses it:
+// a pulsing mark (`live`) or a walking crab (`run`).
 const svg = (W: number, H: number, body: string): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${CRAB_CSS}${body}</svg>`
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${body.includes('class="live"') ? LIVE_CSS : ''}${body.includes(' run"') ? CRAB_CSS : ''}${body}</svg>`
 
 // The pane's own title already says "Agents": the header names the flow, if any.
 const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): string => {
@@ -819,6 +832,34 @@ const inputOf = (u: Usage): number => (u.input_tokens || 0) + (u.cache_read_inpu
 // The row as drawn: its title in the panel's language.
 const rootRow = (r: AgentRun | null): AgentRun | null => (r ? { ...r, description: tr().main } : null)
 
+// Drawings kept between redraws, keyed by everything a drawing depends on, so a row
+// that did not change is not built again. Two generations: a redraw reuses either, and
+// keeps only what it used, so rows no longer shown drop out.
+type Memo = { begin: () => void; reset: () => void; get: (key: string, build: () => string) => string }
+
+const makeMemo = (): Memo => {
+  let prev = new Map<string, string>()
+  let next = new Map<string, string>()
+  return {
+    begin: () => {
+      prev = next
+      next = new Map()
+    },
+    reset: () => {
+      prev = new Map()
+      next = new Map()
+    },
+    get: (key, build) => {
+      const hit = next.get(key) ?? prev.get(key) ?? build()
+      next.set(key, hit)
+      return hit
+    },
+  }
+}
+
+// A subagent's thread as last fetched; `version` says which events it was fetched after.
+type Thread = { version: number; found: SessionMessage[] | { deny: string } }
+
 // Opens the agents pane, or closes it when it is up; true when it ends up open.
 // Moves the pane's window; a pane that cannot be scrolled (no surface, a test)
 // still shows what it holds, so a refusal or a throw is let go.
@@ -832,7 +873,8 @@ async function scrollPane($: EngineInterface, to: 'start' | 'end'): Promise<void
 
 // A thread opens on its newest message and keeps up with the ones that follow,
 // as the pane's end does until the person scrolls away from it.
-async function openThread($: EngineInterface, id: string): Promise<void> {
+async function openThread($: EngineInterface, id: string, refresh: () => void): Promise<void> {
+  refresh()
   await update($, panel, prev => ({ ...prev, viewing: id }))
   await scrollPane($, 'end')
 }
@@ -856,10 +898,65 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   void $.ui.open({ id: PANE, title: tr().pane })
 }
 
+const memo = makeMemo()
+// Per agent: how many events changed its thread, and the thread as fetched at some count.
+const threadVersion = new Map<string, number>()
+const threads = new Map<string, Thread>()
+const touchThread = (agentId: string | undefined): void => {
+  if (agentId) threadVersion.set(agentId, (threadVersion.get(agentId) ?? 0) + 1)
+}
+
+// The clock ticks only while something runs (1 s, for the elapsed times) or, with
+// only finished subagents on the panel, slowly (to notice a reused one). It is
+// cancelled when neither holds and started again by the event that starts work.
+const FAST_MS = 1000
+const POLL_MS = 5000
+let ticker: { ms: number; timer: Timer } | undefined
+let lastPoll = -Infinity
+
+const isBusy = async ($: EngineInterface): Promise<boolean> =>
+  (await read($, agents)).some(a => a.status === 'running') || (await read($, root))?.status === 'running'
+
+async function syncTicker($: EngineInterface): Promise<void> {
+  const list = await read($, agents)
+  const ms = (await isBusy($)) ? FAST_MS : list.some(a => a.agentId && a.status !== 'running') ? POLL_MS : 0
+  if (ticker?.ms === ms) return
+  ticker?.timer.cancel()
+  ticker = ms ? { ms, timer: $.clock.every(ms, () => void tick($)) } : undefined
+}
+
+// Ticks the running clocks (agents', and the main session's mid-turn).
+// A finished row whose agent the engine lists as at work again was reused by a way no
+// hook here heard (the engine keeps an agent's turns from the hooks its spawn ran in).
+async function tick($: EngineInterface): Promise<void> {
+  const at = await $.clock.now()
+  const list = await read($, agents)
+  if (list.some(a => a.agentId && a.status !== 'running') && at - lastPoll >= POLL_MS) {
+    lastPoll = at
+    let live: Awaited<ReturnType<typeof $.agent.list>> = []
+    try {
+      live = await $.agent.list()
+    } catch {
+      // No agent list from this host: a reuse shows once its own events say so.
+    }
+    const woken = live.filter(l => l.status === 'pending' || l.status === 'running' || l.status === 'waiting').map(l => l.id)
+    if (woken.some(id => list.some(a => a.agentId === id && a.status !== 'running'))) {
+      await update($, agents, rows => woken.reduce((acc, id) => renew(acc, id, at), rows))
+    }
+  }
+  if (await isBusy($)) await update($, now, () => at)
+  await syncTicker($)
+}
+
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     lang = await detectLang($, options.language)
+    // A reload starts from nothing: no timer of the old module, no drawing kept.
+    ticker?.timer.cancel()
+    ticker = undefined
+    memo.reset()
+    threads.clear()
     await $.tool.register({
       name: 'progress',
       description:
@@ -931,28 +1028,7 @@ export const register: Register = (on, options) => {
       return usage ? withContext(dated, usage.context) : dated
     })
 
-    // Ticks the running clocks (agents', and the main session's mid-turn); quiet when nothing runs.
-    // A finished row whose agent the engine lists as at work again was reused by a way no
-    // hook here heard (the engine keeps an agent's turns from the hooks its spawn ran in).
-    $.clock.every(1000, () => {
-      void (async () => {
-        const at = await $.clock.now()
-        if ((await read($, agents)).some(a => a.agentId && a.status !== 'running')) {
-          let live: Awaited<ReturnType<typeof $.agent.list>> = []
-          try {
-            live = await $.agent.list()
-          } catch {
-            // No agent list from this host: a reuse shows once its own events say so.
-          }
-          const woken = live.filter(l => l.status === 'pending' || l.status === 'running' || l.status === 'waiting').map(l => l.id)
-          await update($, agents, list => woken.reduce((rows, id) => renew(rows, id, at), list))
-        }
-        const list = await read($, agents)
-        const main = await read($, root)
-        if (!list.some(a => a.status === 'running') && main?.status !== 'running') return
-        await update($, now, () => at)
-      })()
-    })
+    await syncTicker($)
     // Once per session: a hot reload after the person closed the panel does not reopen it.
     if (options.openAtStart !== 'off') await autoOpen($, 'session-start')
     return started
@@ -979,6 +1055,7 @@ export const register: Register = (on, options) => {
     if (isNewFlow(prev, input) && input.title !== undefined) {
       // A new flow starts with a clean list; agents still running stay.
       await update($, agents, list => list.filter(a => a.status === 'running'))
+      await syncTicker($)
     }
     const next = await update($, flow, p => merge(p, input))
     if (next && input.tasks?.length) await autoOpen($, next.title)
@@ -1039,9 +1116,13 @@ export const register: Register = (on, options) => {
     const at = await $.clock.now()
     await update($, agents, rows => renew(rows, row.agentId as string, at, { summary: input.summary, prompt: input.message }))
     await update($, now, () => at)
+    await syncTicker($)
     const sent = await next(e)
     // Refused, nothing resumed: the row is as it was.
-    if (sent.deny !== undefined) await update($, agents, rows => rows.map(a => (a.id === row.id && a.status === 'running' ? row : a)))
+    if (sent.deny !== undefined) {
+      await update($, agents, rows => rows.map(a => (a.id === row.id && a.status === 'running' ? row : a)))
+      await syncTicker($)
+    }
     return sent
   })
 
@@ -1054,8 +1135,12 @@ export const register: Register = (on, options) => {
       const at = await $.clock.now()
       await update($, agents, list => renew(list, resumed, at, { prompt: e.prompt }))
       await update($, now, () => at)
+      await syncTicker($)
       const started = await next(e)
-      if (started.deny !== undefined) await update($, agents, list => list.map(a => (a.id === before.id && a.status === 'running' && before.status !== 'running' ? before : a)))
+      if (started.deny !== undefined) {
+        await update($, agents, list => list.map(a => (a.id === before.id && a.status === 'running' && before.status !== 'running' ? before : a)))
+        await syncTicker($)
+      }
       return started
     }
 
@@ -1086,6 +1171,7 @@ export const register: Register = (on, options) => {
       return [...list.filter(a => a.id !== run.id), run].slice(-200)
     })
     await update($, now, () => at)
+    await syncTicker($)
     if (e.subagentType.startsWith('savvy-')) {
       const f = await read($, flow)
       await autoOpen($, f && !f.isFinished ? f.title : 'savvy-flow')
@@ -1104,9 +1190,12 @@ export const register: Register = (on, options) => {
     if (agentId === undefined) {
       await update($, root, (prev): AgentRun => ({ ...(prev ?? newRoot(at)), status: 'running' }))
       await update($, now, () => at)
+      await syncTicker($)
     } else if ((await read($, agents)).some(a => a.agentId === agentId && a.status !== 'running')) {
+      touchThread(agentId)
       await update($, agents, list => renew(list, agentId, at, { prompt: e.text }))
       await update($, now, () => at)
+      await syncTicker($)
     }
     return started
   })
@@ -1140,6 +1229,7 @@ export const register: Register = (on, options) => {
     }
 
     const model = usage.model || e.model
+    touchThread(agentId)
     await update($, agents, list =>
       list.map((a): AgentRun =>
         a.agentId !== agentId
@@ -1159,6 +1249,7 @@ export const register: Register = (on, options) => {
             },
       ),
     )
+    await syncTicker($)
     return result
   })
 
@@ -1166,6 +1257,7 @@ export const register: Register = (on, options) => {
     const agentId = e.agentId
     if (agentId) {
       const at = await $.clock.now()
+      touchThread(agentId)
       await update($, agents, list =>
         list.map((a): AgentRun => {
           if (a.agentId !== agentId) return a
@@ -1188,11 +1280,13 @@ export const register: Register = (on, options) => {
         }),
       )
       await update($, now, () => at)
+      await syncTicker($)
     } else {
       // The main loop's turn ended: its row rests until the next prompt.
       const at = await $.clock.now()
       await update($, root, (prev): AgentRun => ({ ...(prev ?? newRoot(at)), status: 'idle' }))
       await update($, now, () => at)
+      await syncTicker($)
     }
     return next(e)
   })
@@ -1225,7 +1319,14 @@ export const register: Register = (on, options) => {
     const p: Panel = await read($, panel)
     // The main session's row, pinned first; absent only before the session started.
     const main = rootRow(await read($, root))
-    const at = Math.max(await read($, now), ...list.map(a => a.startedAt), main?.startedAt ?? 0, 0)
+    // A thread is not redrawn by the clock: it reads the time off the clock once, and not from the ticking `now`.
+    const isThread = e.surface === 'desktop' && 'Svg' in ui && Boolean(p.viewing && list.find(a => a.id === p.viewing)?.agentId)
+    const at = Math.max(isThread ? await $.clock.now() : await read($, now), ...list.map(a => a.startedAt), main?.startedAt ?? 0, 0)
+    memo.begin()
+    if (!isThread) threads.clear()
+    // A drawing is rebuilt only when what it shows changed: a run that ended no longer depends on the time.
+    const rowKey = (W: number, a: AgentRun, titled: boolean) => JSON.stringify([W, titled, lang, a, a.endedAt === undefined ? at : 0])
+    const agentDrawing = (W: number, a: AgentRun, titled = true) => memo.get(`a${rowKey(W, a, titled)}`, () => agentSvg(W, a, at, titled))
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
@@ -1271,16 +1372,16 @@ export const register: Register = (on, options) => {
       // Svg nor a Box takes a press, so the title is a Button laid over the row.
       const agentRow = (a: AgentRun, state: string) => {
         const alt = `${a.description}: ${modelName(a.model)}, ${state}`
-        if (!a.agentId) return <Svg key={a.id} source={agentSvg(W, a, at)} alt={alt} width={W} height={66} />
+        if (!a.agentId) return <Svg key={a.id} source={agentDrawing(W, a)} alt={alt} width={W} height={66} />
         return (
           <Box key={`row-${a.id}`}>
-            <Svg source={agentSvg(W, a, at, false)} alt={alt} width={W} height={66} />
+            <Svg source={agentDrawing(W, a, false)} alt={alt} width={W} height={66} />
             <Box position="absolute" top={0} left={isRtl() ? 0 : 5} right={isRtl() ? 5 : 0} alignItems={isRtl() ? 'flex-end' : 'flex-start'}>
               <Button
                 key={`view-${a.id}`}
                 label={fitText(a.description || a.type, 13, W - 42 - 22)}
                 plain
-                onPress={() => openThread($, a.id)}
+                onPress={() => openThread($, a.id, () => touchThread(a.agentId))}
               />
             </Box>
           </Box>
@@ -1302,7 +1403,14 @@ export const register: Register = (on, options) => {
             }}
           />
         )
-        const found = await $.session.messages({ agentId: viewing.agentId })
+        // The thread is fetched again when an event of this agent changed it, not on the clock.
+        const version = threadVersion.get(viewing.agentId) ?? 0
+        let cached = threads.get(viewing.agentId)
+        if (!cached || cached.version !== version) {
+          cached = { version, found: await $.session.messages({ agentId: viewing.agentId }) }
+          threads.set(viewing.agentId, cached)
+        }
+        const found = cached.found
         let budget = THREAD_CHARS
         let first = 'deny' in found ? 0 : found.length
         while (!('deny' in found) && first > 0) {
@@ -1326,7 +1434,7 @@ export const register: Register = (on, options) => {
         return (
           <Box flexDirection="column" gap={1} alignItems={align}>
             {back('back')}
-            <Svg source={agentSvg(W, viewing, at)} alt={`${viewing.description}: ${modelName(viewing.model)}`} width={W} height={66} />
+            <Svg source={agentDrawing(W, viewing)} alt={`${viewing.description}: ${modelName(viewing.model)}`} width={W} height={66} />
             {thread.length > 0 ? thread : <Text dimColor>{s.noThread}</Text>}
             {back('back-end')}
           </Box>
@@ -1350,7 +1458,7 @@ export const register: Register = (on, options) => {
           {/* The grid sizes the pane; the content is placed over it, as an
               absolute Box paints over the siblings before it. */}
           {gridTiles(gridH).map((tileH, i) => (
-            <Svg key={`grid-${i}`} source={gridSvg(W, tileH)} alt="dotted grid" width={W} height={tileH} />
+            <Svg key={`grid-${i}`} source={memo.get(`g${W}x${tileH}`, () => gridSvg(W, tileH))} alt="dotted grid" width={W} height={tileH} />
           ))}
           <Box flexDirection="column" position="absolute" top={0} left={0} right={0} alignItems={align}>
             <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
@@ -1358,7 +1466,7 @@ export const register: Register = (on, options) => {
             {main && (
               <Svg
                 key={main.id}
-                source={agentSvg(W, main, at)}
+                source={agentDrawing(W, main)}
                 alt={`${main.description}: ${modelName(main.model)}, ${main.status === 'running' ? s.isRunning : s.isIdle}`}
                 width={W}
                 height={66}
@@ -1372,7 +1480,7 @@ export const register: Register = (on, options) => {
               finished.map(a => agentRow(a, s.isFinished))}
             {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
             {planned.map(pl => (
-              <Svg key={`plan-${pl.n}`} source={plannedSvg(W, pl)} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
+              <Svg key={`plan-${pl.n}`} source={memo.get(`p${JSON.stringify([W, lang, pl])}`, () => plannedSvg(W, pl))} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
             ))}
           </Box>
         </Box>
