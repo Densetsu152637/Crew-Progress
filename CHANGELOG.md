@@ -6,6 +6,9 @@ Version bumps before 0.13.0 were not committed one by one, so entries before 0.1
 
 ## [Unreleased]
 
+### Added
+- `CONTRIBUTING.md` and agent instructions (`AGENTS.md`, `CLAUDE.md`): changes target the `experimental` branch, and a release into `main` needs the maintainer's explicit confirmation. CI also runs on pushes to `experimental`.
+
 ## [1.0.0] - 2026-10-26
 
 First stable release. The [public surface](docs/public-surface.md) now follows semantic versioning: a breaking change to it needs a new major version.
