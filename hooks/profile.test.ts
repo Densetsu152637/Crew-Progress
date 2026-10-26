@@ -52,8 +52,8 @@ const rowOf = async ($: Engine, description: string): Promise<string> => {
   const rows = await ui.findAll({ type: 'Svg' })
   const at = rows.findIndex(el => String(el.props.alt).startsWith(`${description}:`))
   await ui.unmount()
-  // The row's text and, in the drawing laid over it, its crab.
-  return String(rows[at]?.props.source ?? '') + String(rows[at + 1]?.props.alt === '' ? rows[at + 1]?.props.source : '')
+  // The row's text between its crab and its status mark.
+  return [rows[at - 1], rows[at], rows[at + 1]].map(el => String(el?.props.source ?? '')).join('')
 }
 
 // Drawn as `role`: its costume, that costume's prop, and the role word under the title.

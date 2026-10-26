@@ -724,11 +724,19 @@ const progressOf = (a: AgentRun): number | null => {
 const ctxOf = (a: AgentRun): number => (a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0)
 
 // `titled: false` leaves the title out, for a row whose title is drawn as a pressable over it.
+// A row is three images side by side, in flow: the crab, the text, the status mark. Only the text
+// changes every second (the elapsed time); the other two depend on the row's costume and state alone,
+// so their markup holds while it runs and their CSS animations are not started over.
+const CRAB_COL = 40
+const MARK_COL = 22
+const rowTextW = (W: number): number => W - CRAB_COL - MARK_COL
+
 const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => {
+  const TW = rowTextW(W)
   const s = tr()
   const color = colorOf(roleOf(a))
   const ctx = ctxOf(a)
-  const textW = W - 42 - 22
+  const textW = TW - 2
   const meta = [runModel(a)]
   if (a.round > 1) meta.push(`${s.round} ${a.round}`)
   if (a.status === 'failed') meta.push(s.failed)
@@ -740,23 +748,30 @@ const agentSvg = (W: number, a: AgentRun, at: number, titled = true): string => 
   // Without reported steps the bar falls back to the context, drawn grey.
   const fillW = Math.round(barW * (progress ?? ctx / 100))
   return svg(
-    W,
+    TW,
     66,
-    `${titled ? `<text class="t" ${startText(W, 42, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
-<text ${startText(W, 42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
-${steps && stepsW > 30 ? `<text class="t" ${startText(W, 42, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
-<text class="s" ${endText(W, 42 + barW, 49, true)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
-<rect class="k" x="${mx(W, 42, barW)}" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="${mx(W, 42, fillW)}" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
-<line class="ln" x1="0" y1="65.5" x2="${W}" y2="65.5"/>`,
+    `${titled ? `<text class="t" ${startText(TW, 2, 18)} font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>` : ''}
+<text ${startText(TW, 2, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(roleLabel(a))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
+${steps && stepsW > 30 ? `<text class="t" ${startText(TW, 2, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
+<text class="s" ${endText(TW, 2 + barW, 49, true)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
+<rect class="k" x="${mx(TW, 2, barW)}" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="${mx(TW, 2, fillW)}" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
+<line class="ln" x1="0" y1="65.5" x2="${TW}" y2="65.5"/>`,
   )
 }
 
-// What moves in a row, drawn apart from its text: the crab and the status mark. The text changes
-// every second (the elapsed time) and an image whose markup changes is loaded again, which starts
-// its CSS animations over; this one depends only on the row's costume and state, so it stays as it is.
-const agentMotionSvg = (W: number, a: AgentRun): string =>
-  svg(W, 66, `${rowCrab(W, 0, 14, costumeOf(a), false, a.status === 'running')}
-${statusMark(mx(W, W - 8), 16, a.status, colorOf(roleOf(a)))}`)
+// The status word a row's mark is read as.
+const statusWord = (status: string): string => {
+  const s = tr()
+  return status === 'running' ? s.isRunning : status === 'failed' ? s.failed : status === 'idle' ? s.isIdle : s.isFinished
+}
+
+const rowLine = (w: number): string => `<line class="ln" x1="0" y1="65.5" x2="${w}" y2="65.5"/>`
+
+const agentCrabSvg = (a: AgentRun): string =>
+  svg(CRAB_COL, 66, `${rowCrab(CRAB_COL, 0, 14, costumeOf(a), false, a.status === 'running')}${rowLine(CRAB_COL)}`)
+
+const agentMarkSvg = (a: AgentRun): string =>
+  svg(MARK_COL, 66, `${statusMark(isRtl() ? 8 : MARK_COL - 8, 16, a.status, colorOf(roleOf(a)))}${rowLine(MARK_COL)}`)
 
 const plannedSvg = (W: number, p: Planned): string => {
   const tier = p.tier in TIER_COLOR ? p.tier : 'other'
@@ -1345,8 +1360,8 @@ export const register: Register = (on, options) => {
     // A drawing is rebuilt only when what it shows changed: a run that ended no longer depends on the time.
     const rowKey = (W: number, a: AgentRun, titled: boolean) => JSON.stringify([W, titled, lang, a, a.endedAt === undefined ? at : 0])
     const agentDrawing = (W: number, a: AgentRun, titled = true) => memo.get(`a${rowKey(W, a, titled)}`, () => agentSvg(W, a, at, titled))
-    const motionDrawing = (W: number, a: AgentRun) =>
-      memo.get(`m${JSON.stringify([W, lang, costumeOf(a), roleOf(a), a.status])}`, () => agentMotionSvg(W, a))
+    const crabDrawing = (a: AgentRun) => memo.get(`c${JSON.stringify([lang, costumeOf(a), a.status])}`, () => agentCrabSvg(a))
+    const markDrawing = (a: AgentRun) => memo.get(`k${JSON.stringify([lang, roleOf(a), a.status])}`, () => agentMarkSvg(a))
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
@@ -1387,31 +1402,15 @@ export const register: Register = (on, options) => {
       // In Hebrew the column hugs the right edge: section heads and buttons right-aligned.
       const align = isRtl() ? 'flex-end' : undefined
 
-      // The crab and status mark of a row, laid over its text: they are their own image, so the
-      // text changing each second does not load them again and restart their animation.
-      const motion = (a: AgentRun) => (
-        <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-          <Svg source={motionDrawing(W, a)} alt="" width={W} height={66} />
-        </Box>
-      )
-      // A row's drawing: its text with the motion over it.
-      const drawn = (a: AgentRun, alt: string) => (
-        <Box key={a.id}>
-          <Svg source={agentDrawing(W, a)} alt={alt} width={W} height={66} />
-          {motion(a)}
-        </Box>
-      )
-
-      // A subagent's row: pressing its title opens its thread in the pane, in place
-      // of the agents (the desktop app keeps its main view to itself). Neither an
-      // Svg nor a Box takes a press, so the title is a Button laid over the row.
-      const agentRow = (a: AgentRun, state: string) => {
-        const alt = `${a.description}: ${modelName(a.model)}, ${state}`
-        if (!a.agentId) return drawn(a, alt)
-        return (
-          <Box key={`row-${a.id}`}>
-            <Svg source={agentDrawing(W, a, false)} alt={alt} width={W} height={66} />
-            {motion(a)}
+      // A row's drawing: crab, text and status mark side by side (mirrored in Hebrew), each its own
+      // image so the text changing each second does not load the other two again. With `view`, the
+      // title is a Button laid over the text.
+      const drawn = (a: AgentRun, alt: string, view = false) => (
+        <Box key={view ? `row-${a.id}` : a.id} flexDirection={isRtl() ? 'row-reverse' : 'row'}>
+          <Svg source={crabDrawing(a)} alt={`${costumeOf(a)} crab`} width={CRAB_COL} height={66} />
+          <Svg source={agentDrawing(W, a, !view)} alt={alt} width={rowTextW(W)} height={66} />
+          <Svg source={markDrawing(a)} alt={statusWord(a.status)} width={MARK_COL} height={66} />
+          {view && (
             <Box position="absolute" top={0} left={isRtl() ? 0 : 5} right={isRtl() ? 5 : 0} alignItems={isRtl() ? 'flex-end' : 'flex-start'}>
               <Button
                 key={`view-${a.id}`}
@@ -1420,8 +1419,16 @@ export const register: Register = (on, options) => {
                 onPress={() => openThread($, a.id, () => touchThread(a.agentId))}
               />
             </Box>
-          </Box>
-        )
+          )}
+        </Box>
+      )
+
+      // A subagent's row: pressing its title opens its thread in the pane, in place
+      // of the agents (the desktop app keeps its main view to itself). Neither an
+      // Svg nor a Box takes a press, so the title is a Button laid over the row.
+      const agentRow = (a: AgentRun, state: string) => {
+        const alt = `${a.description}: ${modelName(a.model)}, ${state}`
+        return drawn(a, alt, Boolean(a.agentId))
       }
 
       // A subagent's thread in place of the agents, its row on top and a way back above

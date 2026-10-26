@@ -259,3 +259,29 @@ test('anim: every running drawing carries the CSS that moves it', async ($, on) 
     await clock.advance(1000)
   }
 })
+
+// A pane row's images sit in flow, side by side: an image laid over another by an absolute Box was
+// not painted by the desktop. The pane's content as a whole sits in one absolute Box over its grid;
+// no Svg may be in a second one inside it, and each says what it shows.
+test('rows: every image is in flow and has an alt', async ($, on) => {
+  await session($, on)
+  await $.turn.start({ text: 'go', turnId: 'm1' } as never)
+  await spawn($)
+  await $.agent.spawn({ ...SPAWN, tool_use_id: 't2', description: 'Other work' } as never)
+  await finish($)
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'Pane', requestId: 'crew-agents', props: pane })
+  const found: { alt: string; absolute: number }[] = []
+  const walk = (node: unknown, absolute: number): void => {
+    if (Array.isArray(node)) return node.forEach(n => walk(n, absolute))
+    if (!node || typeof node !== 'object') return
+    const n = node as { type?: string; props?: Record<string, unknown>; children?: unknown }
+    const here = absolute + (n.props?.position === 'absolute' ? 1 : 0)
+    if (n.type === 'Svg') found.push({ alt: String(n.props?.alt ?? ''), absolute })
+    walk(n.children ?? n.props?.children, here)
+  }
+  walk(await ui.drawn(), 0)
+  await ui.unmount()
+  expect(found.length).toBeGreaterThanOrEqual(10)
+  expect(found.filter(f => f.absolute > 1)).toHaveLength(0)
+  expect(found.filter(f => !f.alt)).toHaveLength(0)
+})

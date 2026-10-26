@@ -89,8 +89,8 @@ test('root: desktop draws a crowned row that walks while the turn runs and rests
     const svgs = await ui.findAll({ type: 'Svg' })
     const at = svgs.findIndex(el => String(el.props.alt).startsWith('Main session:'))
     const row = svgs[at]
-    // The crab is its own drawing, laid over the row's text.
-    const crab = String(svgs[at + 1]?.props.source)
+    // The crab and the status mark are drawings of their own, either side of the row's text.
+    const crab = String(svgs[at - 1]?.props.source) + String(svgs[at + 1]?.props.source)
     await ui.unmount()
     return { alt: String(row?.props.alt), source: String(row?.props.source) + crab }
   }

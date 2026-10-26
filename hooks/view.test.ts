@@ -57,8 +57,8 @@ test("view: pressing a subagent's row opens its thread in place of the agents", 
   expect(texts).toEqual(['Check the build.', 'Looking at the config.', 'The build is fine.'])
   expect(await thread.find({ type: 'Text', text: /→ Read · \/repo\/build\.json/ })).toBeDefined()
   // The agents list is gone while the thread shows: only the viewed run's row is drawn.
-  // The crab's own drawing, laid over the row, has no description.
-  expect((await thread.findAll({ type: 'Svg' })).map(el => String(el.props.alt)).filter(Boolean)).toEqual(['Side work: Haiku 4.5'])
+  // The row is its crab, its text and its status mark.
+  expect((await thread.findAll({ type: 'Svg' })).map(el => String(el.props.alt))).toEqual(['tester crab', 'Side work: Haiku 4.5', 'running'])
 })
 
 test('view: the back button returns to the agents', async ($, on) => {
