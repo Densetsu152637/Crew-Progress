@@ -6,6 +6,14 @@ Version bumps before 0.13.0 were not committed one by one, so entries before 0.1
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-01
+
+### Added
+- A session resumed in a new process keeps its panel. The engine holds a plugin's state only for the process, so a session that sat inactive and was resumed came back with an empty panel and lost the open thread. The panel's flow, rows, main-session row and open thread are now copied to the plugin's store under the session's id a moment after they change (and at the end of every turn), together with each subagent's conversation, cut to what a thread draws. A resumed session restores them: runs that were still running when the old process ended read as finished with the error mark, and a thread the engine can no longer read is drawn from the kept copy. The copies of the ten most recent sessions are kept.
+
+### Changed
+- When a subagent's turn ends, the panel reads its conversation once to keep it.
+
 ## [1.0.1] - 2026-10-27
 
 ### Added

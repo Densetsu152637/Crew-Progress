@@ -3,6 +3,8 @@ import type { EngineInterface, Register, SessionContextUsage, SessionMessage, Se
 
 import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
 
+import { AGENT_CHARS, INDEX_KEY, keepThread, keepThreads, reviveSnapshot, snapshotKey, TOOL_ARG_KEYS, touchIndex } from './keep'
+import type { KeptMessage, Snapshot } from './keep'
 import { CLAY, COSTUMES, CRAB_BOX, CRAB_CSS, CRAB_SCALE, crab, colorOf, TIER_COLOR } from './crabs'
 
 // the-crew: a fork of johnnyvizz's savvy-progress (MIT) that adds the main
@@ -614,7 +616,7 @@ const THREAD_CHARS = 90000
 
 // One line per tool call in a thread: the tool, and the argument that says most about it.
 const toolLine = (use: { tool: string; input: Record<string, unknown> }): string => {
-  const arg = ['description', 'file_path', 'path', 'command', 'pattern', 'url', 'query'].map(k => use.input[k]).find(v => typeof v === 'string' && v)
+  const arg = TOOL_ARG_KEYS.map(k => use.input[k]).find(v => typeof v === 'string' && v)
   const name = use.tool.startsWith('mcp__') ? use.tool.split('__').slice(2).join('__') || use.tool : use.tool
   return typeof arg === 'string' ? `${name} · ${arg.replace(/\s+/g, ' ')}` : name
 }
@@ -885,6 +887,69 @@ const touchThread = (agentId: string | undefined): void => {
   if (agentId) threadVersion.set(agentId, (threadVersion.get(agentId) ?? 0) + 1)
 }
 
+// --- keeping the panel between runs of a session. The engine holds a plugin's state for the process
+// only, so a session resumed later would start with an empty panel and lose its threads. A copy goes to
+// the plugin's store under the session's id, written a moment after the panel's state changes.
+const SAVE_MS = 2000
+const SAVED_KEYS = new Set(['flow', 'agents', 'root', 'panel'])
+let sessionId = ''
+// Per agent: its conversation as last read, cut to what a thread draws, for when the engine no longer answers for it.
+const keptThreads = new Map<string, KeptMessage[]>()
+let saveTimer: Timer | undefined
+
+async function saveSnapshot($: EngineInterface): Promise<void> {
+  saveTimer = undefined
+  if (!sessionId) return
+  try {
+    const list = await read($, agents)
+    const p: Panel = await read($, panel)
+    const snapshot: Snapshot = {
+      shape: 1,
+      savedAt: await $.clock.now(),
+      flow: await read($, flow),
+      agents: list,
+      root: await read($, root),
+      panel: { isCompact: p.isCompact, isDoneCollapsed: p.isDoneCollapsed, viewing: p.viewing ?? '' },
+      threads: keepThreads(keptThreads, list),
+    }
+    await $.store.set(snapshotKey(sessionId), snapshot)
+    const { index, dropped } = touchIndex(await $.store.get(INDEX_KEY), sessionId)
+    await $.store.set(INDEX_KEY, index)
+    for (const id of dropped) await $.store.delete(snapshotKey(id))
+  } catch {
+    // The store is a convenience: a refusal (too large, no store) leaves the panel as it is.
+  }
+}
+
+const scheduleSave = ($: EngineInterface): void => {
+  if (sessionId && !saveTimer) saveTimer = $.clock.after(SAVE_MS, () => void saveSnapshot($))
+}
+
+// A conversation as the thread draws it, kept in memory for the next save.
+const keepConversation = (agentId: string, found: SessionMessage[] | { deny: string }): void => {
+  if (Array.isArray(found) && found.length > 0) keptThreads.set(agentId, keepThread(found, THREAD_TEXT, AGENT_CHARS))
+}
+
+// The stored copy of this session, if any. Its threads are always loaded; its panel only into an empty one
+// (a hot reload keeps the live state, which is newer than the copy).
+async function loadSnapshot($: EngineInterface): Promise<void> {
+  if (!sessionId) return
+  let snapshot: Snapshot | undefined
+  try {
+    snapshot = reviveSnapshot(await $.store.get(snapshotKey(sessionId)))
+  } catch {
+    return
+  }
+  if (!snapshot) return
+  for (const [id, thread] of Object.entries(snapshot.threads)) keptThreads.set(id, thread)
+  const isEmpty = (await read($, agents)).length === 0 && (await read($, flow)) === null && (await read($, root)) === null
+  if (!isEmpty) return
+  await update($, flow, () => snapshot.flow)
+  await update($, agents, () => snapshot.agents)
+  await update($, root, () => snapshot.root)
+  await update($, panel, prev => ({ ...prev, ...snapshot.panel }))
+}
+
 // The clock ticks only while something runs, for the elapsed times. It is cancelled when nothing does
 // and started again by the event that starts work. A subagent reused after it finished is noticed by
 // the rows its conversation then stores (`session.append`) and by its turn, spawn and message events,
@@ -942,6 +1007,15 @@ export const register: Register = (on, options) => {
     threads.clear()
     paneSurfaces.clear()
     band = undefined
+    saveTimer?.cancel()
+    saveTimer = undefined
+    keptThreads.clear()
+    try {
+      sessionId = await $.session.id()
+    } catch {
+      sessionId = ''
+    }
+    await loadSnapshot($)
     // What the panel's state says now: finished subagents and the open thread, for the hooks that mirror them.
     const kept = await read($, agents)
     finishedAgents.clear()
@@ -1277,6 +1351,12 @@ export const register: Register = (on, options) => {
       const at = await $.clock.now()
       touchThread(agentId)
       finishedAgents.add(agentId)
+      // Its conversation is whole now: keep it for a session resumed later.
+      try {
+        keepConversation(agentId, await $.session.messages({ agentId }))
+      } catch {
+        // Nothing to keep from this host.
+      }
       await update($, agents, list =>
         list.map((a): AgentRun => {
           if (a.agentId !== agentId) return a
@@ -1307,7 +1387,17 @@ export const register: Register = (on, options) => {
       await update($, now, () => at)
       await syncTicker($)
     }
+    // A turn is over: write the copy now rather than after the usual wait, as the process may end next.
+    saveTimer?.cancel()
+    await saveSnapshot($)
     return next(e)
+  })
+
+  // Every change to the panel's state is copied to the store a moment later.
+  on('state.set', { plugin: 'the-crew' }, async ($, e, next) => {
+    const set = await next(e)
+    if (SAVED_KEYS.has(e.key)) scheduleSave($)
+    return set
   })
 
   // The engine's own measure of the main session after each main-thread turn
@@ -1452,7 +1542,12 @@ export const register: Register = (on, options) => {
         const version = threadVersion.get(viewing.agentId) ?? 0
         let cached = threads.get(viewing.agentId)
         if (!cached || cached.version !== version) {
-          cached = { version, found: await $.session.messages({ agentId: viewing.agentId }) }
+          let found = await $.session.messages({ agentId: viewing.agentId })
+          // The engine may no longer hold the conversation (a session resumed in a new process): draw the kept copy.
+          const copy = keptThreads.get(viewing.agentId)
+          if (copy && (!Array.isArray(found) || found.length === 0)) found = copy as SessionMessage[]
+          else keepConversation(viewing.agentId, found)
+          cached = { version, found }
           threads.set(viewing.agentId, cached)
         }
         const found = cached.found

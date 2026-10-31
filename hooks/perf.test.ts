@@ -283,8 +283,10 @@ test('thread: closing the thread stops the fetches', async ($, on) => {
   await ui.press({ key: 'back' })
   const before = calls.messages
   await note($, 'a1', 'After close.')
-  await finish($)
   expect(calls.messages).toBe(before)
+  // The agent's last turn reads its conversation once more, to keep it for a resumed session; nothing else does.
+  await finish($)
+  expect(calls.messages).toBe(before + 1)
   await ui.unmount()
 })
 
